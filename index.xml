@@ -2,11 +2,11 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>0xSaber.io</title>
-    <link>https://example.org/</link>
+    <link>https://raoxuanxuan.github.io/articles/</link>
     <description>Recent content on 0xSaber.io</description>
     <generator>Hugo</generator>
     <language>en-us</language>
     <lastBuildDate></lastBuildDate>
-    <atom:link href="https://example.org/index.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="https://raoxuanxuan.github.io/articles/index.xml" rel="self" type="application/rss+xml" />
   </channel>
 </rss>
