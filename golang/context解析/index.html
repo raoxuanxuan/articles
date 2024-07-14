@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    
+    <title>Context解析 | 0xSaber.io</title>
+    <meta name="viewport" content="width=device-width,minimum-scale=1">
+    <meta name="description" content="1. go context是什么 一句话描述：go context是一个在gorouting间传递终止信号、做超时控制、传递请求数据的方案。
+2. 为什么有go context 传递请求数据比较简单， 传递终止信号和做超时控制都是为了更优雅的终止掉一个gorouting。为什么需要研究如何终止一个gorouting的问题？
+因为后台服务往往是组合式的命令请求：一个客户端的请求到后台后，需要查询多个下游服务，并把下游服务的返回结果做一定的逻辑运算，然后拼接组合起来返回给客户端。如下图所示： 假设客户端和业务后台mySvr的超时设定是800ms，mySvr串行访问upstreamSvr1和upstreamSvr2两个上游服务，下面个两种场景存在资源的浪费：
+mySvr内有个耗时的操作，花了900ms。此时，800ms过后，client已经认为超时，弃掉这次请求的数据，mySvr再对upstreamSvr1和upstreamSvr2的请求已经无效。 upstreamSvr1有耗时操作，导致upStreamSvr2还没请求时已经超过了800ms的总耗时，此时client认为超时，mySvr再请求upstreamSvr2已经意义了，造成UpsgreamSvr2的资源浪费。 这两种情况都需要提前停止掉浪费的操作，那么当能够取消一个gorouting或中途终止一个gorouting，那么就可以避免资源浪费。
+特别对于go服务来说，它的特点比较明显：
+每个请求都在自己的gorouting中执行 处理请求的gorouting又会启动其他gorouting访问下游服务，这些goorouting都有两个特性： 需要一些request-specific的数据，比如uin，client-ip，token等 顶层gorouting被终止(如客户端断开)或超时，下层gorouting就没有再运行的意义 传递数据这个比较简单，而对于传递终止信号结束掉gorouting来说，如果没有context，我们看看应该如何做? 全局channel&#43;select的方式可以完成，如下：
+package main import ( &#34;fmt&#34; &#34;sync&#34; &#34;time&#34; ) var stop = make(chan string) func main() { var wg sync.WaitGroup wg.Add(1) go func() { defer wg.Done() select { case action := &lt;-stop: fmt.Println(action, &#34; gorouting&#34;) } }() time.AfterFunc(time.Second*2, func() { stop &lt;- &#34;stop&#34; }) wg.Wait() } main在2秒后向匿名gorouting中通过全局channel的方式来终止匿名gorouting的运行。这种方式是最简单的做法，当需要控制多个gorouting时，需要多个全局channel。而当gorouting中又起了新的gorouting时，通过这种方式来控制gorouting的终止就变的非常复杂。
+2. go中context的实现 说到底，context实际上还是用select&#43;channel的模式，但是增加了从顶传递、超时判断、数据携带等逻辑，最关键的是让gorouting的终止变得统一控制。">
+    <meta name="generator" content="Hugo 0.128.2">
+    
+    
+    
+    
+      <meta name="robots" content="noindex, nofollow">
+    
+    
+
+    
+<link rel="stylesheet" href="/ananke/css/main.min.css" >
+
+
+
+    
+
+    
+      
+
+    
+
+    
+
+    
+      <link rel="canonical" href="http://localhost:1313/golang/context%E8%A7%A3%E6%9E%90/">
+    
+
+    <meta property="og:url" content="http://localhost:1313/golang/context%E8%A7%A3%E6%9E%90/">
+  <meta property="og:site_name" content="0xSaber.io">
+  <meta property="og:title" content="Context解析">
+  <meta property="og:description" content="1. go context是什么 一句话描述：go context是一个在gorouting间传递终止信号、做超时控制、传递请求数据的方案。
+2. 为什么有go context 传递请求数据比较简单， 传递终止信号和做超时控制都是为了更优雅的终止掉一个gorouting。为什么需要研究如何终止一个gorouting的问题？
+因为后台服务往往是组合式的命令请求：一个客户端的请求到后台后，需要查询多个下游服务，并把下游服务的返回结果做一定的逻辑运算，然后拼接组合起来返回给客户端。如下图所示： 假设客户端和业务后台mySvr的超时设定是800ms，mySvr串行访问upstreamSvr1和upstreamSvr2两个上游服务，下面个两种场景存在资源的浪费：
+mySvr内有个耗时的操作，花了900ms。此时，800ms过后，client已经认为超时，弃掉这次请求的数据，mySvr再对upstreamSvr1和upstreamSvr2的请求已经无效。 upstreamSvr1有耗时操作，导致upStreamSvr2还没请求时已经超过了800ms的总耗时，此时client认为超时，mySvr再请求upstreamSvr2已经意义了，造成UpsgreamSvr2的资源浪费。 这两种情况都需要提前停止掉浪费的操作，那么当能够取消一个gorouting或中途终止一个gorouting，那么就可以避免资源浪费。
+特别对于go服务来说，它的特点比较明显：
+每个请求都在自己的gorouting中执行 处理请求的gorouting又会启动其他gorouting访问下游服务，这些goorouting都有两个特性： 需要一些request-specific的数据，比如uin，client-ip，token等 顶层gorouting被终止(如客户端断开)或超时，下层gorouting就没有再运行的意义 传递数据这个比较简单，而对于传递终止信号结束掉gorouting来说，如果没有context，我们看看应该如何做? 全局channel&#43;select的方式可以完成，如下：
+package main import ( &#34;fmt&#34; &#34;sync&#34; &#34;time&#34; ) var stop = make(chan string) func main() { var wg sync.WaitGroup wg.Add(1) go func() { defer wg.Done() select { case action := &lt;-stop: fmt.Println(action, &#34; gorouting&#34;) } }() time.AfterFunc(time.Second*2, func() { stop &lt;- &#34;stop&#34; }) wg.Wait() } main在2秒后向匿名gorouting中通过全局channel的方式来终止匿名gorouting的运行。这种方式是最简单的做法，当需要控制多个gorouting时，需要多个全局channel。而当gorouting中又起了新的gorouting时，通过这种方式来控制gorouting的终止就变的非常复杂。
+2. go中context的实现 说到底，context实际上还是用select&#43;channel的模式，但是增加了从顶传递、超时判断、数据携带等逻辑，最关键的是让gorouting的终止变得统一控制。">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="golang">
+    <meta property="article:published_time" content="2024-07-14T21:53:17+08:00">
+    <meta property="article:modified_time" content="2024-07-14T21:53:17+08:00">
+
+  <meta itemprop="name" content="Context解析">
+  <meta itemprop="description" content="1. go context是什么 一句话描述：go context是一个在gorouting间传递终止信号、做超时控制、传递请求数据的方案。
+2. 为什么有go context 传递请求数据比较简单， 传递终止信号和做超时控制都是为了更优雅的终止掉一个gorouting。为什么需要研究如何终止一个gorouting的问题？
+因为后台服务往往是组合式的命令请求：一个客户端的请求到后台后，需要查询多个下游服务，并把下游服务的返回结果做一定的逻辑运算，然后拼接组合起来返回给客户端。如下图所示： 假设客户端和业务后台mySvr的超时设定是800ms，mySvr串行访问upstreamSvr1和upstreamSvr2两个上游服务，下面个两种场景存在资源的浪费：
+mySvr内有个耗时的操作，花了900ms。此时，800ms过后，client已经认为超时，弃掉这次请求的数据，mySvr再对upstreamSvr1和upstreamSvr2的请求已经无效。 upstreamSvr1有耗时操作，导致upStreamSvr2还没请求时已经超过了800ms的总耗时，此时client认为超时，mySvr再请求upstreamSvr2已经意义了，造成UpsgreamSvr2的资源浪费。 这两种情况都需要提前停止掉浪费的操作，那么当能够取消一个gorouting或中途终止一个gorouting，那么就可以避免资源浪费。
+特别对于go服务来说，它的特点比较明显：
+每个请求都在自己的gorouting中执行 处理请求的gorouting又会启动其他gorouting访问下游服务，这些goorouting都有两个特性： 需要一些request-specific的数据，比如uin，client-ip，token等 顶层gorouting被终止(如客户端断开)或超时，下层gorouting就没有再运行的意义 传递数据这个比较简单，而对于传递终止信号结束掉gorouting来说，如果没有context，我们看看应该如何做? 全局channel&#43;select的方式可以完成，如下：
+package main import ( &#34;fmt&#34; &#34;sync&#34; &#34;time&#34; ) var stop = make(chan string) func main() { var wg sync.WaitGroup wg.Add(1) go func() { defer wg.Done() select { case action := &lt;-stop: fmt.Println(action, &#34; gorouting&#34;) } }() time.AfterFunc(time.Second*2, func() { stop &lt;- &#34;stop&#34; }) wg.Wait() } main在2秒后向匿名gorouting中通过全局channel的方式来终止匿名gorouting的运行。这种方式是最简单的做法，当需要控制多个gorouting时，需要多个全局channel。而当gorouting中又起了新的gorouting时，通过这种方式来控制gorouting的终止就变的非常复杂。
+2. go中context的实现 说到底，context实际上还是用select&#43;channel的模式，但是增加了从顶传递、超时判断、数据携带等逻辑，最关键的是让gorouting的终止变得统一控制。">
+  <meta itemprop="datePublished" content="2024-07-14T21:53:17+08:00">
+  <meta itemprop="dateModified" content="2024-07-14T21:53:17+08:00">
+  <meta itemprop="wordCount" content="1013">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Context解析">
+  <meta name="twitter:description" content="1. go context是什么 一句话描述：go context是一个在gorouting间传递终止信号、做超时控制、传递请求数据的方案。
+2. 为什么有go context 传递请求数据比较简单， 传递终止信号和做超时控制都是为了更优雅的终止掉一个gorouting。为什么需要研究如何终止一个gorouting的问题？
+因为后台服务往往是组合式的命令请求：一个客户端的请求到后台后，需要查询多个下游服务，并把下游服务的返回结果做一定的逻辑运算，然后拼接组合起来返回给客户端。如下图所示： 假设客户端和业务后台mySvr的超时设定是800ms，mySvr串行访问upstreamSvr1和upstreamSvr2两个上游服务，下面个两种场景存在资源的浪费：
+mySvr内有个耗时的操作，花了900ms。此时，800ms过后，client已经认为超时，弃掉这次请求的数据，mySvr再对upstreamSvr1和upstreamSvr2的请求已经无效。 upstreamSvr1有耗时操作，导致upStreamSvr2还没请求时已经超过了800ms的总耗时，此时client认为超时，mySvr再请求upstreamSvr2已经意义了，造成UpsgreamSvr2的资源浪费。 这两种情况都需要提前停止掉浪费的操作，那么当能够取消一个gorouting或中途终止一个gorouting，那么就可以避免资源浪费。
+特别对于go服务来说，它的特点比较明显：
+每个请求都在自己的gorouting中执行 处理请求的gorouting又会启动其他gorouting访问下游服务，这些goorouting都有两个特性： 需要一些request-specific的数据，比如uin，client-ip，token等 顶层gorouting被终止(如客户端断开)或超时，下层gorouting就没有再运行的意义 传递数据这个比较简单，而对于传递终止信号结束掉gorouting来说，如果没有context，我们看看应该如何做? 全局channel&#43;select的方式可以完成，如下：
+package main import ( &#34;fmt&#34; &#34;sync&#34; &#34;time&#34; ) var stop = make(chan string) func main() { var wg sync.WaitGroup wg.Add(1) go func() { defer wg.Done() select { case action := &lt;-stop: fmt.Println(action, &#34; gorouting&#34;) } }() time.AfterFunc(time.Second*2, func() { stop &lt;- &#34;stop&#34; }) wg.Wait() } main在2秒后向匿名gorouting中通过全局channel的方式来终止匿名gorouting的运行。这种方式是最简单的做法，当需要控制多个gorouting时，需要多个全局channel。而当gorouting中又起了新的gorouting时，通过这种方式来控制gorouting的终止就变的非常复杂。
+2. go中context的实现 说到底，context实际上还是用select&#43;channel的模式，但是增加了从顶传递、超时判断、数据携带等逻辑，最关键的是让gorouting的终止变得统一控制。">
+
+	
+  </head>
+
+  <body class="ma0 avenir bg-near-white">
+
+    
+   
+  
+
+  <header>
+    <div class="bg-black">
+      <nav class="pv3 ph3 ph4-ns" role="navigation">
+  <div class="flex-l justify-between items-center center">
+    <a href="/" class="f3 fw2 hover-white no-underline white-90 dib">
+      
+        0xSaber.io
+      
+    </a>
+    <div class="flex-l items-center">
+      
+
+      
+      
+<div class="ananke-socials">
+  
+</div>
+
+    </div>
+  </div>
+</nav>
+
+    </div>
+  </header>
+
+
+
+    <main class="pb7" role="main">
+      
+  
+  <article class="flex-l flex-wrap justify-between mw8 center ph3">
+    <header class="mt4 w-100">
+      <aside class="instapaper_ignoref b helvetica tracked ttu">
+          
+        Golangs
+      </aside>
+      
+
+
+
+
+
+
+
+
+
+
+  <div id="sharing" class="mt3 ananke-socials">
+    
+  </div>
+
+
+      <h1 class="f1 athelas mt3 mb1">Context解析</h1>
+      
+      
+      
+      <time class="f6 mv4 dib tracked" datetime="2024-07-14T21:53:17+08:00">July 14, 2024</time>
+      
+
+      
+      
+    </header>
+    <div class="nested-copy-line-height lh-copy serif f4 nested-links mid-gray pr4-l w-two-thirds-l"><h1 id="1-go-context是什么">1. go context是什么</h1>
+<p>一句话描述：go context是一个在gorouting间传递终止信号、做超时控制、传递请求数据的方案。</p>
+<h1 id="2-为什么有go-context">2. 为什么有go context</h1>
+<p>传递请求数据比较简单， 传递终止信号和做超时控制都是为了更优雅的终止掉一个gorouting。为什么需要研究如何终止一个gorouting的问题？</p>
+<p>因为后台服务往往是组合式的命令请求：一个客户端的请求到后台后，需要查询多个下游服务，并把下游服务的返回结果做一定的逻辑运算，然后拼接组合起来返回给客户端。如下图所示：
+<img src="https://km.woa.com/asset/a5166c68f9d445ab82486cd815009e54?height=329&amp;width=730" alt="组合命令式请求">
+假设客户端和业务后台mySvr的超时设定是800ms，mySvr串行访问upstreamSvr1和upstreamSvr2两个上游服务，下面个两种场景存在资源的浪费：</p>
+<ol>
+<li>mySvr内有个耗时的操作，花了900ms。此时，800ms过后，client已经认为超时，弃掉这次请求的数据，mySvr再对upstreamSvr1和upstreamSvr2的请求已经无效。</li>
+<li>upstreamSvr1有耗时操作，导致upStreamSvr2还没请求时已经超过了800ms的总耗时，此时client认为超时，mySvr再请求upstreamSvr2已经意义了，造成UpsgreamSvr2的资源浪费。</li>
+</ol>
+<p>这两种情况都需要提前停止掉浪费的操作，那么当能够取消一个gorouting或中途终止一个gorouting，那么就可以避免资源浪费。</p>
+<p>特别对于go服务来说，它的特点比较明显：</p>
+<ul>
+<li>每个请求都在自己的gorouting中执行</li>
+<li>处理请求的gorouting又会启动其他gorouting访问下游服务，这些goorouting都有两个特性：
+<ul>
+<li>需要一些request-specific的数据，比如uin，client-ip，token等</li>
+<li>顶层gorouting被终止(如客户端断开)或超时，下层gorouting就没有再运行的意义</li>
+</ul>
+</li>
+</ul>
+<p>传递数据这个比较简单，而对于传递终止信号结束掉gorouting来说，如果没有context，我们看看应该如何做? 全局channel+select的方式可以完成，如下：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#f92672">package</span> <span style="color:#a6e22e">main</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">import</span> (
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">&#34;fmt&#34;</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">&#34;sync&#34;</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#e6db74">&#34;time&#34;</span>
+</span></span><span style="display:flex;"><span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">var</span> <span style="color:#a6e22e">stop</span> = make(<span style="color:#66d9ef">chan</span> <span style="color:#66d9ef">string</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">main</span>() {
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">var</span> <span style="color:#a6e22e">wg</span> <span style="color:#a6e22e">sync</span>.<span style="color:#a6e22e">WaitGroup</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">wg</span>.<span style="color:#a6e22e">Add</span>(<span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">go</span> <span style="color:#66d9ef">func</span>() {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">defer</span> <span style="color:#a6e22e">wg</span>.<span style="color:#a6e22e">Done</span>()
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">select</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">case</span> <span style="color:#a6e22e">action</span> <span style="color:#f92672">:=</span> <span style="color:#f92672">&lt;-</span><span style="color:#a6e22e">stop</span>:
+</span></span><span style="display:flex;"><span>      <span style="color:#a6e22e">fmt</span>.<span style="color:#a6e22e">Println</span>(<span style="color:#a6e22e">action</span>, <span style="color:#e6db74">&#34; gorouting&#34;</span>)
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>  }()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">AfterFunc</span>(<span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">Second</span><span style="color:#f92672">*</span><span style="color:#ae81ff">2</span>, <span style="color:#66d9ef">func</span>() {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">stop</span> <span style="color:#f92672">&lt;-</span> <span style="color:#e6db74">&#34;stop&#34;</span>
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">wg</span>.<span style="color:#a6e22e">Wait</span>()
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>main在2秒后向匿名gorouting中通过全局channel的方式来终止匿名gorouting的运行。这种方式是最简单的做法，当需要控制多个gorouting时，需要多个全局channel。而当gorouting中又起了新的gorouting时，通过这种方式来控制gorouting的终止就变的非常复杂。</p>
+<h1 id="2-go中context的实现">2. go中context的实现</h1>
+<p>说到底，context实际上还是用select+channel的模式，但是增加了从顶传递、超时判断、数据携带等逻辑，最关键的是让gorouting的终止变得统一控制。</p>
+<h2 id="21-接口和类">2.1 接口和类</h2>
+<p>context是go中的一个interface，go同时原生提供了context interface的四个实现：</p>
+<ul>
+<li>cancelCtx：用来提供基本的“终止协程”的能力</li>
+<li>timerCtx：在cancelCtx的基础上，有了超时选项，提供“超时时终止协程”的能力</li>
+<li>valueCtx：提供携带数据的能力</li>
+<li>emptyCtx：空的ctx，一般作为最顶层的context，相当于java里的Object类</li>
+</ul>
+<p>context包的UML图如下所示：
+<img src="https://km.woa.com/asset/49fb5c07a8514f069238e79d9003d674?height=692&amp;width=930" alt=""></p>
+<p>context接口描述一个ctx的行为，canceler接口描述终止的行为。emptyCtx和valueCtx实现了context接口，cancelCtx实现了context和canceler接口，timerCtx继承自cancelCtx。</p>
+<h2 id="22-ctx树">2.2 ctx树</h2>
+<p>为了说明ctx的用途，引入ctx树这个概念，表示各个ctx的之间的关系。</p>
+<p>go提供了一系列WithXXXCtx的函数来创建这些ctx，这些函数都需要传入一个parent ctx作为父节点，返回一个新的ctx，并建立了parent和新ctx的父子关系。</p>
+<ul>
+<li>WithCancel：创建一个终止ctx</li>
+<li>WithTimeout/WithDeadline：创建一个超时终止ctx</li>
+<li>WithValue：创建一个终止ctx，可以携带一个key-value的数据</li>
+<li>Background：创建一个空的ctx</li>
+</ul>
+<p>WithXXX系列函数会构造出如下的ctx树：
+<img src="https://km.woa.com/asset/41fc2d65e5f846b8a0d2056e46141c51?height=732&amp;width=981" alt="ctx树">
+其中， 每一个ctx都作用在一个gorouting上。上图表示，用background作为顶层ctx开始一个gorouting，又通过WithXXX系列函数创建了subCtxX和subsubCtxX后，整个ctx树就会如上图所示。</p>
+<p>在上图中，虚线箭头的路径上都是没有终止控制的，如ValueCtx1是调用WithValue方法，以background为parent创建，这些ctx也不会被终止。实线箭头表示能进行终止控制的父子关系，如subCtx3是调用WithCancel方法，以cancelCtx1作为parent创建的，之后，cancelCtx1的终止会影响到subCtx3的终止。</p>
+<p>可以看出，在这棵ctx树上，只有以cancelCtx或它的组合类型为父节点，即以它们为parent参数调用WithXXX函数，才会有控制子ctx终止的能力。</p>
+<p>值得说明的是，subsubCtx1在创建时以subCtx4为父节点，但是subCtx4没有终止能力，也不会受其他ctx终止的影响，所以subsubCtx1以withCancel调用创建时，最终会以cancelCtx1，即subCtx4的parent，作为parent。这一点后面也会说明。</p>
+<p>下面，通过详细说明context的实现细节，来阐述go是如何通过ctx树来控制所有的gorouting的。</p>
+<h2 id="3-context">3. context</h2>
+<p>context的设计如下：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">Context</span> <span style="color:#66d9ef">interface</span> {
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">Deadline</span>() (<span style="color:#a6e22e">deadline</span> <span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">Time</span>, <span style="color:#a6e22e">ok</span> <span style="color:#66d9ef">bool</span>)
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">Done</span>() <span style="color:#f92672">&lt;-</span><span style="color:#66d9ef">chan</span> <span style="color:#66d9ef">struct</span>{}
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">Err</span>() <span style="color:#66d9ef">error</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">Value</span>(<span style="color:#a6e22e">key</span> <span style="color:#66d9ef">interface</span>{}) <span style="color:#66d9ef">interface</span>{}
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>context接口一共有四个方法，其中：</p>
+<ul>
+<li>Deadline方法是timerCtx专用的，返回当这个timerCtx的到期时间，ok为true时，表示设置过。</li>
+<li>Done方法需要在select的上下文中使用，它返回一个channel，当context被终止时，该channel会被关闭。如果这个ctx永远不会被终止的话，Done方法返回nil
+<ul>
+<li>对于WithCancel，当cancel方法调用时，Done会返回关闭的channel</li>
+<li>对于WithDeadline/WithTimeout，当时间到时，Done会返回关闭的channel</li>
+</ul>
+</li>
+<li>Err方法用来解释Done为啥被关闭，如果Done没有关闭，Err方法返回nil。而关闭的原因也无非有二：
+<ul>
+<li>context被终止了</li>
+<li>context的deadline到了</li>
+</ul>
+</li>
+<li>Value方法则是valueCtx专用的，返回和这个context关联的某个key的值，如果没有这个key，返回nil。这个key是在WithValue函数里设置的。一般来说，valueCtx里的key-value应该是整个request-response域内都需要用到的值，比如客户端ip、服务端ip，而不是随便的什么参数。</li>
+</ul>
+<h1 id="4-cancelctx">4. cancelCtx</h1>
+<h2 id="4-1-cancelctx是什么">4. 1 cancelCtx是什么</h2>
+<p>cancelCtx用来实现gorouting的终止，由cancelCtx结构体和canceler接口来实现。cancelCtx的children字段保存了所有可以终止的子ctx。可以看出，children的类型是一个canceler接口对象，并不是一个context接口对象。说明，cancelCtx只要求其子ctx能够终止即可，并不一定非得是context对象；换句话说，如果某个ctx没有终止功能，也不会成为cancelCtx的子节点。当某个cancelCtx被终止时，任何实现了canceler接口的子ctx都可以被终止。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">cancelCtx</span> <span style="color:#66d9ef">struct</span> {
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">Context</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">mu</span>       <span style="color:#a6e22e">sync</span>.<span style="color:#a6e22e">Mutex</span>            
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">done</span>     <span style="color:#66d9ef">chan</span> <span style="color:#66d9ef">struct</span>{}         
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">children</span> <span style="color:#66d9ef">map</span>[<span style="color:#a6e22e">canceler</span>]<span style="color:#66d9ef">struct</span>{}
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">err</span>      <span style="color:#66d9ef">error</span>                
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">canceler</span> <span style="color:#66d9ef">interface</span> {
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">cancel</span>(<span style="color:#a6e22e">removeFromParent</span> <span style="color:#66d9ef">bool</span>, <span style="color:#a6e22e">err</span> <span style="color:#66d9ef">error</span>)
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">Done</span>() <span style="color:#f92672">&lt;-</span><span style="color:#66d9ef">chan</span> <span style="color:#66d9ef">struct</span>{}
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>cancelCtx结构体内嵌Context接口：</p>
+<ul>
+<li>mu用来在并发时保护其他字段</li>
+<li>done是一个channel，终止时会关闭done，Context的Done方法也是检测这个done。</li>
+<li>children用来保存这个ctx所有的子ctx，依次来控制子ctx的终止</li>
+<li>err在被终止时设置终止原因</li>
+</ul>
+<p>canceler是一个接口，相当于终止器，有两个方法：</p>
+<ul>
+<li>cancel：终止某个ctx，removeFromParent表示当这个ctx被终止时，是不是需要从它的父ctx上移除。err表示被终止的原因。</li>
+<li>Done：同Context接口的Done</li>
+</ul>
+<h2 id="42-如何使用cancelcontext">4.2 如何使用cancelContext</h2>
+<p>以下是展示cancelCtx如何使用的例子。改了一下上面全局select+channel的例子：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">main</span>() {
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">var</span> <span style="color:#a6e22e">wg</span> <span style="color:#a6e22e">sync</span>.<span style="color:#a6e22e">WaitGroup</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">wg</span>.<span style="color:#a6e22e">Add</span>(<span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">ctx</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">context</span>.<span style="color:#a6e22e">Background</span>()
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">subCtx</span>, <span style="color:#a6e22e">cancelFunc</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">context</span>.<span style="color:#a6e22e">WithCancel</span>(<span style="color:#a6e22e">ctx</span>)
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">go</span> <span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">ctx</span> <span style="color:#a6e22e">context</span>.<span style="color:#a6e22e">Context</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">defer</span> <span style="color:#a6e22e">wg</span>.<span style="color:#a6e22e">Done</span>()
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">select</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">case</span> <span style="color:#f92672">&lt;-</span><span style="color:#a6e22e">ctx</span>.<span style="color:#a6e22e">Done</span>():
+</span></span><span style="display:flex;"><span>      <span style="color:#a6e22e">fmt</span>.<span style="color:#a6e22e">Println</span>(<span style="color:#e6db74">&#34;subCtx Done&#34;</span>)
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">return</span>
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>  }(<span style="color:#a6e22e">subCtx</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">AfterFunc</span>(<span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">Second</span><span style="color:#f92672">*</span><span style="color:#ae81ff">2</span>, <span style="color:#66d9ef">func</span>() {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">fmt</span>.<span style="color:#a6e22e">Println</span>(<span style="color:#e6db74">&#34;start cancel&#34;</span>)
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">cancelFunc</span>()
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">wg</span>.<span style="color:#a6e22e">Wait</span>()
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>解释如下：</p>
+<ol>
+<li>首先创建通用Background这个ctx</li>
+<li>以Background作为父ctx，创建了子subCtx，并得到一个可以终止subCtx的一个函数cancelFunc</li>
+<li>用subCtx作为参数启动一个gorouting，当subCtx被关闭时，会打印出“subCtx Done&quot;</li>
+<li>模拟终止操作：main中两秒后，会调用cancelFunc来终止3里的gorouting。</li>
+</ol>
+<p>从上面的例子可以看出，cancelCtx依赖手动调用WithCancel返回的终止函数，当终止函数被调用时，subCtx中的Done会被关闭，从而退出gorouting。</p>
+<p>当有多个父子关系的gorouting时，是什么场景呢？例子如下：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">subFunc</span>(<span style="color:#a6e22e">ctx</span> <span style="color:#a6e22e">context</span>.<span style="color:#a6e22e">Context</span>, <span style="color:#a6e22e">name</span> <span style="color:#66d9ef">string</span>) {
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">select</span> {
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">case</span> <span style="color:#f92672">&lt;-</span><span style="color:#a6e22e">ctx</span>.<span style="color:#a6e22e">Done</span>():
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">fmt</span>.<span style="color:#a6e22e">Println</span>(<span style="color:#a6e22e">name</span>, <span style="color:#e6db74">&#34; Done&#34;</span>)
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span>
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">main</span>() {
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">var</span> <span style="color:#a6e22e">wg</span> <span style="color:#a6e22e">sync</span>.<span style="color:#a6e22e">WaitGroup</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">wg</span>.<span style="color:#a6e22e">Add</span>(<span style="color:#ae81ff">2</span>)
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">ctx</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">context</span>.<span style="color:#a6e22e">Background</span>()
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">subCtx1</span>, <span style="color:#a6e22e">cancelFunc1</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">context</span>.<span style="color:#a6e22e">WithCancel</span>(<span style="color:#a6e22e">ctx</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">go</span> <span style="color:#66d9ef">func</span>() {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">defer</span> <span style="color:#a6e22e">wg</span>.<span style="color:#a6e22e">Done</span>()
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">subFunc</span>(<span style="color:#a6e22e">subCtx1</span>, <span style="color:#e6db74">&#34;myfunc&#34;</span>)
+</span></span><span style="display:flex;"><span>  }()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">subCtx2</span>, <span style="color:#a6e22e">_</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">context</span>.<span style="color:#a6e22e">WithCancel</span>(<span style="color:#a6e22e">subCtx1</span>)
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">go</span> <span style="color:#66d9ef">func</span>() {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">defer</span> <span style="color:#a6e22e">wg</span>.<span style="color:#a6e22e">Done</span>()
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">subFunc</span>(<span style="color:#a6e22e">subCtx2</span>, <span style="color:#e6db74">&#34;mysubfunc&#34;</span>)
+</span></span><span style="display:flex;"><span>  }()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">AfterFunc</span>(<span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">Second</span><span style="color:#f92672">*</span><span style="color:#ae81ff">2</span>, <span style="color:#66d9ef">func</span>() {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">fmt</span>.<span style="color:#a6e22e">Println</span>(<span style="color:#e6db74">&#34;start cancel&#34;</span>)
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">cancelFunc1</span>()
+</span></span><span style="display:flex;"><span>  })
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">wg</span>.<span style="color:#a6e22e">Wait</span>()
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>解释如下：</p>
+<ol>
+<li>首先创建通用background这个ctx</li>
+<li>以background作为父ctx，创建了subCtx1，并得到一个可以终止subCtx1的一个函数cancelFunc1</li>
+<li>以subCtx1作为父ctx，创建了subCtx2</li>
+<li>分别起了两个gorouting，一个传入subCtx1，一个传入subCtx2</li>
+<li>模拟终止操作：两秒后，main中调用subCtx1的终止函数cancelFunc1。由于subCtx1和subCtx2是父子关系，发现两个gorouting都被终止了。</li>
+</ol>
+<h2 id="43-cancelctx实现细节">4.3 cancelCtx实现细节</h2>
+<p>###4.3.1  创建cancelCtx</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">WithCancel</span>(<span style="color:#a6e22e">parent</span> <span style="color:#a6e22e">Context</span>) (<span style="color:#a6e22e">ctx</span> <span style="color:#a6e22e">Context</span>, <span style="color:#a6e22e">cancel</span> <span style="color:#a6e22e">CancelFunc</span>)
+</span></span></code></pre></div><p>WithCancel以parent为父ctx，创建了子ctx，并返回这个子ctx以便传入到其他gorouting中来控制其他gorouting的终止，另外返回了一个终止函数，终止函数类型CancelFunc仅仅是一个空的函数类型。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">CancelFunc</span> <span style="color:#66d9ef">func</span>() {}
+</span></span></code></pre></div><p>具体如何终止，由context的实现来定义。
+WithCancel具体是如何做的的呢？</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">WithCancel</span>(<span style="color:#a6e22e">parent</span> <span style="color:#a6e22e">Context</span>) (<span style="color:#a6e22e">ctx</span> <span style="color:#a6e22e">Context</span>, <span style="color:#a6e22e">cancel</span> <span style="color:#a6e22e">CancelFunc</span>) {
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">c</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">newCancelCtx</span>(<span style="color:#a6e22e">parent</span>)
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">propagateCancel</span>(<span style="color:#a6e22e">parent</span>, <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">c</span>)
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">c</span>, <span style="color:#66d9ef">func</span>() { <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">cancel</span>(<span style="color:#66d9ef">true</span>, <span style="color:#a6e22e">Canceled</span>) }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>newCancelCtx很简单，只是返回一个新的初始化了的cancelContext，把Context字段填充为parent。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">newCancelCtx</span>(<span style="color:#a6e22e">parent</span> <span style="color:#a6e22e">Context</span>) <span style="color:#a6e22e">cancelCtx</span> {
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">cancelCtx</span>{<span style="color:#a6e22e">Context</span>: <span style="color:#a6e22e">parent</span>}
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>返回新创建的ctx，和一个匿名函数，这个匿名函数中会调用新创建的ctx的终止函数，Canceld是一个预定义的错误，表示手动终止。</p>
+<p>propagateCancel是cancelContext的核心函数，主要功能是：来把新创建的ctx挂载到整个ctx树的合适位置，来确保新创建的ctx能在任何一个父ctx终止时被终止。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">propagateCancel</span>(<span style="color:#a6e22e">parent</span> <span style="color:#a6e22e">Context</span>, <span style="color:#a6e22e">child</span> <span style="color:#a6e22e">canceler</span>) {
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> <span style="color:#a6e22e">parent</span>.<span style="color:#a6e22e">Done</span>() <span style="color:#f92672">==</span> <span style="color:#66d9ef">nil</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> <span style="color:#75715e">// parent is never canceled
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  }
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> <span style="color:#a6e22e">p</span>, <span style="color:#a6e22e">ok</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">parentCancelCtx</span>(<span style="color:#a6e22e">parent</span>); <span style="color:#a6e22e">ok</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">p</span>.<span style="color:#a6e22e">mu</span>.<span style="color:#a6e22e">Lock</span>()
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> <span style="color:#a6e22e">p</span>.<span style="color:#a6e22e">err</span> <span style="color:#f92672">!=</span> <span style="color:#66d9ef">nil</span> {
+</span></span><span style="display:flex;"><span>      <span style="color:#75715e">// parent has already been canceled
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>      <span style="color:#a6e22e">child</span>.<span style="color:#a6e22e">cancel</span>(<span style="color:#66d9ef">false</span>, <span style="color:#a6e22e">p</span>.<span style="color:#a6e22e">err</span>)
+</span></span><span style="display:flex;"><span>    } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">if</span> <span style="color:#a6e22e">p</span>.<span style="color:#a6e22e">children</span> <span style="color:#f92672">==</span> <span style="color:#66d9ef">nil</span> {
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">p</span>.<span style="color:#a6e22e">children</span> = make(<span style="color:#66d9ef">map</span>[<span style="color:#a6e22e">canceler</span>]<span style="color:#66d9ef">struct</span>{})
+</span></span><span style="display:flex;"><span>      }
+</span></span><span style="display:flex;"><span>      <span style="color:#a6e22e">p</span>.<span style="color:#a6e22e">children</span>[<span style="color:#a6e22e">child</span>] = <span style="color:#66d9ef">struct</span>{}{
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">p</span>.<span style="color:#a6e22e">mu</span>.<span style="color:#a6e22e">Unlock</span>()
+</span></span><span style="display:flex;"><span>  } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>      <span style="color:#75715e">//...
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>这个函数的逻辑如下：</p>
+<ol>
+<li>如果parent的Done返回nil，说明parent是永远不会终止的（除非自己退出），那么parent本身就不在cancelCtx树中，自然以该parent为父节点的ctx也不会出现在cancelCtx树中，不用关心终止控制问题。（对于cancelCtx来讲，它的意义就是控制终止的，所以cancelCtx的Done函数永远不会返回nil。其Done也实现为了延迟初始化，调用cancelCtx的Done时，才会把done初始化为一个空的非nil的channel）。</li>
+<li>接着，需要找到该parent所在的整个ctx树链上最近的cancelContext。因为parent不一定是cancelCtx，可能只是因为以某个cancelCtx作为了父节点才出现在cancelCtx树上，那么这种parent就没有保存children的能力，所以需要找到那个真正的cancelCtx。</li>
+<li>parentCancelCtx找到一个真的cancelCtx p后，此时有可能：
+<ul>
+<li>p已经被终止了，或是因为它的parent被终止，或是因为其他逻辑调用了它的cancel函数，那么以它为父节点的这个新创建的ctx也无需再进行了，直接终止即可；</li>
+<li>否则，p会多一个孩子节点，即本child，保存在p的children字段里。如果是第一个孩子节点，先初始化这children字段。</li>
+</ul>
+</li>
+</ol>
+<p>现在看看parentCancelCtxt做了什么</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">parentCancelCtx</span>(<span style="color:#a6e22e">parent</span> <span style="color:#a6e22e">Context</span>) (<span style="color:#f92672">*</span><span style="color:#a6e22e">cancelCtx</span>, <span style="color:#66d9ef">bool</span>) {
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">for</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">switch</span> <span style="color:#a6e22e">c</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">parent</span>.(<span style="color:#66d9ef">type</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">case</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">cancelCtx</span>:
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">c</span>, <span style="color:#66d9ef">true</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">case</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">timerCtx</span>:
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">return</span> <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">cancelCtx</span>, <span style="color:#66d9ef">true</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">case</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">valueCtx</span>:
+</span></span><span style="display:flex;"><span>      <span style="color:#a6e22e">parent</span> = <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">Context</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">default</span>:
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">return</span> <span style="color:#66d9ef">nil</span>, <span style="color:#66d9ef">false</span>
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>从源码来看，parentCancelCtx只会检测传入的parent的类型是不是context包中原生三个实现：</p>
+<ul>
+<li>如果是cancelParent类型，那么要找的cancelContext就是它</li>
+<li>如果是timerCtx类型，timerCtx是封装了cancelCtx，返回它的cancelCtx字段</li>
+<li>如果是valueCtx类型，则循环向上去找还有没有cancelCtx</li>
+</ul>
+<p>看到这里，有个疑问，parentCancelCtx函数只会在原生的三种context类型中找，如果是我们自定义的带有cancel能力的context，一定会返回nil，那么不是永远找不到满足需要的cancelContext吗？答案在propagateCancel的else部分:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">propagateCancel</span>(<span style="color:#a6e22e">parent</span> <span style="color:#a6e22e">Context</span>, <span style="color:#a6e22e">child</span> <span style="color:#a6e22e">canceler</span>) {
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> <span style="color:#a6e22e">parent</span>.<span style="color:#a6e22e">Done</span>() <span style="color:#f92672">==</span> <span style="color:#66d9ef">nil</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> <span style="color:#75715e">// parent is never canceled
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  }
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> <span style="color:#a6e22e">p</span>, <span style="color:#a6e22e">ok</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">parentCancelCtx</span>(<span style="color:#a6e22e">parent</span>); <span style="color:#a6e22e">ok</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// ...
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">go</span> <span style="color:#66d9ef">func</span>() {
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">select</span> {
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">case</span> <span style="color:#f92672">&lt;-</span><span style="color:#a6e22e">parent</span>.<span style="color:#a6e22e">Done</span>():
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">child</span>.<span style="color:#a6e22e">cancel</span>(<span style="color:#66d9ef">false</span>, <span style="color:#a6e22e">parent</span>.<span style="color:#a6e22e">Err</span>())
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">case</span> <span style="color:#f92672">&lt;-</span><span style="color:#a6e22e">child</span>.<span style="color:#a6e22e">Done</span>():
+</span></span><span style="display:flex;"><span>      }
+</span></span><span style="display:flex;"><span>    }()
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>如果向上没有找到原生的cancelCtx，分两种情况：</p>
+<ol>
+<li>找到了最顶层的emptyCtx，此时，整个链路上都没有需要控制终止的ctx，那么只需要各自等待Done退出，管好自己就行了。</li>
+<li>parent是自定义的ctx，那么当parent终止时，把当前ctx也终止掉；当前ctx终止时，退出gorouting即可。</li>
+</ol>
+<p>###4.3.2 终止cancelCtx
+终止怎么做呢？实现canceler接口的cancel方法。看看cancelCtx是怎么实现的：</p>
+<ol>
+<li>关闭当前ctx的done channel</li>
+<li>终止当前ctx的children ctx</li>
+<li>看看是否需要从当前ctx的parentCtx上移除</li>
+</ol>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">c</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">cancelCtx</span>) <span style="color:#a6e22e">cancel</span>(<span style="color:#a6e22e">removeFromParent</span> <span style="color:#66d9ef">bool</span>, <span style="color:#a6e22e">err</span> <span style="color:#66d9ef">error</span>) {
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e">// 一些参数检查
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	  <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">err</span> = <span style="color:#a6e22e">err</span>
+</span></span><span style="display:flex;"><span>	  <span style="color:#66d9ef">if</span> <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">done</span> <span style="color:#f92672">==</span> <span style="color:#66d9ef">nil</span> { <span style="color:#75715e">// closechan是默认的空channel
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>		<span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">done</span> = <span style="color:#a6e22e">closedchan</span>
+</span></span><span style="display:flex;"><span>	  } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>		close(<span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">done</span>)
+</span></span><span style="display:flex;"><span>	  }
+</span></span><span style="display:flex;"><span>	  <span style="color:#75715e">// 把所有的子ctx都终止
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	  <span style="color:#66d9ef">for</span> <span style="color:#a6e22e">child</span> <span style="color:#f92672">:=</span> <span style="color:#66d9ef">range</span> <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">children</span> {
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">child</span>.<span style="color:#a6e22e">cancel</span>(<span style="color:#66d9ef">false</span>, <span style="color:#a6e22e">err</span>)
+</span></span><span style="display:flex;"><span>	  }
+</span></span><span style="display:flex;"><span>	  <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">children</span> = <span style="color:#66d9ef">nil</span>
+</span></span><span style="display:flex;"><span>	  <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">mu</span>.<span style="color:#a6e22e">Unlock</span>()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	  <span style="color:#75715e">// 如果需要，会把当前ctx从父ctx上移除
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	  <span style="color:#66d9ef">if</span> <span style="color:#a6e22e">removeFromParent</span> {
+</span></span><span style="display:flex;"><span>		<span style="color:#a6e22e">removeChild</span>(<span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">Context</span>, <span style="color:#a6e22e">c</span>)
+</span></span><span style="display:flex;"><span>	  }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>为什么有removeFromParent这个参数？这是因为：如果在创建ctx时就发现它的parent终止了，就会把parent的所有children删除，所以当children调用cancel时，就无需再次删除。而正常情况下，一定需要把removeFromParent置为true，避免ctx泄露。</p>
+<p>removeChild则只是找到当前ctx的父ctx之后，在父ctx的children字段中删除当前ctx而已。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">removeChild</span>(<span style="color:#a6e22e">parent</span> <span style="color:#a6e22e">Context</span>, <span style="color:#a6e22e">child</span> <span style="color:#a6e22e">canceler</span>) {
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">p</span>, <span style="color:#a6e22e">ok</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">parentCancelCtx</span>(<span style="color:#a6e22e">parent</span>)
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> !<span style="color:#a6e22e">ok</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span>
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">p</span>.<span style="color:#a6e22e">mu</span>.<span style="color:#a6e22e">Lock</span>()
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> <span style="color:#a6e22e">p</span>.<span style="color:#a6e22e">children</span> <span style="color:#f92672">!=</span> <span style="color:#66d9ef">nil</span> {
+</span></span><span style="display:flex;"><span>    delete(<span style="color:#a6e22e">p</span>.<span style="color:#a6e22e">children</span>, <span style="color:#a6e22e">child</span>)
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">p</span>.<span style="color:#a6e22e">mu</span>.<span style="color:#a6e22e">Unlock</span>()
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>整个cancelCtx的流程看下来，cancelCtx把父子gorouting串来形成一个链路，当链路的头ctx被终止时，整个链路上所有的gorouting都会被终止；当链路上某个中间ctx被终止时，其子ctx都会被终止。从而解决了多个gorouting的终止问题。到这里可以看出，cancelCtx依赖propagate建立父子ctx的多叉树，以终止函数作为点燃整个链条的入口，提供了基础的终止多层级gorouting的能力。</p>
+<p>###4.3.3 终止的方式总结</p>
+<p>cancelCtx的cancel有几种方式：</p>
+<ol>
+<li>主动调用cancel</li>
+<li>其父ctx被cancel，触发子ctx的cancel</li>
+<li>time.Timer事件触发timerCtx的cancel回调</li>
+</ol>
+<p>当一个ctx被cancel后，ctx内部的负责通知的channel被关闭，从而触发select此channel的goroutine获得通知，完成相应逻辑的处理。</p>
+<h1 id="5-timerctx">5. timerCtx</h1>
+<p>##5.1 什么是timerCtx</p>
+<p>在cancelCtx的基础上，go又实现了timerCtx，封装了超时逻辑，提供了超时后终止子gorouting的能力。可以猜想，timerCtx除了需要一个cancelCtx提供终止能力外，还需要一个计时器和一个终止时间。当计时器探测到终止时间到达时，调用终止函数即可完成终止操作。go源代码也是这么实现的：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">timerCtx</span> <span style="color:#66d9ef">struct</span> {
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">cancelCtx</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">timer</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">Timer</span> 
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">deadline</span> <span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">Time</span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>timerCtx内嵌了cancelCtx，默认提供了cancelCtx的所有功能，并携带了一个timer用来计时，一个deadline表示到期时间。类似于cancelCtx的WithCancel创建一个新的实例，WithTimeout创建一个新的timerCtx实例。如下：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">WithTimeout</span>(<span style="color:#a6e22e">parent</span> <span style="color:#a6e22e">Context</span>, <span style="color:#a6e22e">timeout</span> <span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">Duration</span>) (<span style="color:#a6e22e">Context</span>, <span style="color:#a6e22e">CancelFunc</span>) {
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">WithDeadline</span>(<span style="color:#a6e22e">parent</span>, <span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">Now</span>().<span style="color:#a6e22e">Add</span>(<span style="color:#a6e22e">timeout</span>))
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>WithTimeout创建的timerCtx以parent为父ctx，当timeout时间过后会终止该timerCtx。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">WithDeadline</span>(<span style="color:#a6e22e">parent</span> <span style="color:#a6e22e">Context</span>, <span style="color:#a6e22e">d</span> <span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">Time</span>) (<span style="color:#a6e22e">Context</span>, <span style="color:#a6e22e">CancelFunc</span>) {
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> <span style="color:#a6e22e">cur</span>, <span style="color:#a6e22e">ok</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">parent</span>.<span style="color:#a6e22e">Deadline</span>(); <span style="color:#a6e22e">ok</span> <span style="color:#f92672">&amp;&amp;</span> <span style="color:#a6e22e">cur</span>.<span style="color:#a6e22e">Before</span>(<span style="color:#a6e22e">d</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">WithCancel</span>(<span style="color:#a6e22e">parent</span>)
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">c</span> <span style="color:#f92672">:=</span> <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">timerCtx</span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">cancelCtx</span>: <span style="color:#a6e22e">newCancelCtx</span>(<span style="color:#a6e22e">parent</span>),
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">deadline</span>:  <span style="color:#a6e22e">d</span>,
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">propagateCancel</span>(<span style="color:#a6e22e">parent</span>, <span style="color:#a6e22e">c</span>)
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">dur</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">Until</span>(<span style="color:#a6e22e">d</span>)
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> <span style="color:#a6e22e">dur</span> <span style="color:#f92672">&lt;=</span> <span style="color:#ae81ff">0</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">cancel</span>(<span style="color:#66d9ef">true</span>, <span style="color:#a6e22e">DeadlineExceeded</span>) <span style="color:#75715e">// deadline has already passed
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">c</span>, <span style="color:#66d9ef">func</span>() { <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">cancel</span>(<span style="color:#66d9ef">false</span>, <span style="color:#a6e22e">Canceled</span>) }
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">mu</span>.<span style="color:#a6e22e">Lock</span>()
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">defer</span> <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">mu</span>.<span style="color:#a6e22e">Unlock</span>()
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">err</span> <span style="color:#f92672">==</span> <span style="color:#66d9ef">nil</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">timer</span> = <span style="color:#a6e22e">time</span>.<span style="color:#a6e22e">AfterFunc</span>(<span style="color:#a6e22e">dur</span>, <span style="color:#66d9ef">func</span>() {
+</span></span><span style="display:flex;"><span>      <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">cancel</span>(<span style="color:#66d9ef">true</span>, <span style="color:#a6e22e">DeadlineExceeded</span>)
+</span></span><span style="display:flex;"><span>    })
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">c</span>, <span style="color:#66d9ef">func</span>() { <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">cancel</span>(<span style="color:#66d9ef">true</span>, <span style="color:#a6e22e">Canceled</span>) }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>WithDeadline是WithTimeout的具体实现，返回一个ctx，这个ctx以parent为父节点，这个ctx在d时长后会失效，从而终止掉这个ctx。这个函数的逻辑如下：</p>
+<ol>
+<li>如果parent的deadline比d还早，那么parent结束的时候，该ctx也要结束。故应该以parent的超时时间为准，子ctx的超时时长d已经没有意义，退化为以parent为父ctx建立了cancelCtx</li>
+<li>以parent和d为参数创建了新的timerCtx，并把新的timerCtx挂载在ctx树的合适位置。</li>
+<li>如果当前已经到失效时间了，立即终止该ctx，终止原因是DeadlineExceeded，即ctx.Err() == DeadlineExceeded，表示因为超时而终止，但同时也返回了Err==Canceld的终止函数，保证在手动调用终止函数时传达正确的语义。</li>
+<li>否则在dur时间后，timer的事件回调中会进行终止ctx的调用，终止原因同样是DeadlineExceeded</li>
+<li>把新的timerCtx和终止函数返回</li>
+</ol>
+<h1 id="6-valuectx">6. valueCtx</h1>
+<p>##6.1 什么是valueCtx</p>
+<p>valueCtx和前面两个有所不同，它不是用来控制gorouting的，而是用来在gorouting之间传递值，所以如前面说书，valueCtx不会受终止影响。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">type</span> <span style="color:#a6e22e">valueCtx</span> <span style="color:#66d9ef">struct</span> {
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">Context</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">key</span>, <span style="color:#a6e22e">val</span> <span style="color:#66d9ef">interface</span>{}
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>valueCtx可以向子ctx传递一个key-value对，这个key-value往往应该是在整个request-response中都会用到的值，而不是什么普通的函数参数。WithValue可以创建一个新的valueCtx:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">WithValue</span>(<span style="color:#a6e22e">parent</span> <span style="color:#a6e22e">Context</span>, <span style="color:#a6e22e">key</span>, <span style="color:#a6e22e">val</span> <span style="color:#66d9ef">interface</span>{}) <span style="color:#a6e22e">Context</span> {
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> <span style="color:#a6e22e">key</span> <span style="color:#f92672">==</span> <span style="color:#66d9ef">nil</span> {
+</span></span><span style="display:flex;"><span>    panic(<span style="color:#e6db74">&#34;nil key&#34;</span>)
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> !<span style="color:#a6e22e">reflect</span>.<span style="color:#a6e22e">TypeOf</span>(<span style="color:#a6e22e">key</span>).<span style="color:#a6e22e">Comparable</span>() {
+</span></span><span style="display:flex;"><span>    panic(<span style="color:#e6db74">&#34;key is not comparable&#34;</span>)
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">valueCtx</span>{<span style="color:#a6e22e">parent</span>, <span style="color:#a6e22e">key</span>, <span style="color:#a6e22e">val</span>}
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h1 id="7-going框架服务是如何使用context的">7. Going框架服务是如何使用context的</h1>
+<h2 id="71-svr端context的使用">7.1 svr端context的使用</h2>
+<p>在going框架的Svr中，每个服务启动监听指定端口，当请求到达时，其ctx流传如下所示：
+<img src="https://km.woa.com/asset/fb3c963d8e7b43a790e8a6e2c421e31d?height=508&amp;width=1078" alt="">
+以TcpServer为例具体说明：
+在TcpServer的Serve中，以context.Background作为顶层的ctx创建了一个子valueCtx，key-value中保存了服务端的ip。在Accept了一个连接后，会启动一个gorouting来处理这个连接。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">srv</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">TCPServer</span>) <span style="color:#a6e22e">Serve</span>(<span style="color:#a6e22e">l</span> <span style="color:#a6e22e">net</span>.<span style="color:#a6e22e">Listener</span>) <span style="color:#66d9ef">error</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">ctx</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">context</span>.<span style="color:#a6e22e">WithValue</span>(<span style="color:#a6e22e">context</span>.<span style="color:#a6e22e">Background</span>(), <span style="color:#a6e22e">ServerAddr</span>, <span style="color:#a6e22e">srv</span>.<span style="color:#a6e22e">addr</span>.<span style="color:#a6e22e">String</span>())
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// ...
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#66d9ef">for</span> !<span style="color:#a6e22e">srv</span>.<span style="color:#a6e22e">closing</span> {
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">rw</span>, <span style="color:#a6e22e">e</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">l</span>.<span style="color:#a6e22e">Accept</span>()
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e">// ...
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#a6e22e">c</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">srv</span>.<span style="color:#a6e22e">newConn</span>(<span style="color:#a6e22e">rw</span>)
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">go</span> <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">serve</span>(<span style="color:#a6e22e">ctx</span>)
+</span></span><span style="display:flex;"><span>    }   
+</span></span><span style="display:flex;"><span>   <span style="color:#75715e">// ...
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#66d9ef">return</span> <span style="color:#66d9ef">nil</span> 
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>c.serve(ctx)中会并发三个gorouting分别负责从客户端读取请求，调用srf服务进行处理，向客户端返回数据三个任务，这三个任务都是通过派生上面ctx来控制的。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">c</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">conn</span>) <span style="color:#a6e22e">serve</span>(<span style="color:#a6e22e">ctx</span> <span style="color:#a6e22e">context</span>.<span style="color:#a6e22e">Context</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">remoteAddr</span> = <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">rwc</span>.<span style="color:#a6e22e">RemoteAddr</span>().<span style="color:#a6e22e">String</span>()
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">ctx</span> = <span style="color:#a6e22e">context</span>.<span style="color:#a6e22e">WithValue</span>(<span style="color:#a6e22e">ctx</span>, <span style="color:#a6e22e">ClientAddr</span>, <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">remoteAddr</span>)
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">ctx</span>, <span style="color:#a6e22e">cancelCtx</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">context</span>.<span style="color:#a6e22e">WithCancel</span>(<span style="color:#a6e22e">ctx</span>)
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">cancelCtx</span> = <span style="color:#a6e22e">cancelCtx</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">defer</span> <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">rwc</span>.<span style="color:#a6e22e">Close</span>()
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// ...
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>}           
+</span></span></code></pre></div><p>conn.serve中，以2中传入的valueCtx创建新的valueCtx，key-value是客户端ip；再以刚刚的valueCtx创建cancelCtx，这个cancelCtx会控制read，work，write三个gorouting。</p>
+<p>其中read里，当接收完整数据并且校验合格时，会检测是否需要终止。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#75715e">// 读取客户端请求
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span> <span style="color:#66d9ef">go</span> <span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">ctx</span> <span style="color:#a6e22e">context</span>.<span style="color:#a6e22e">Context</span>, <span style="color:#a6e22e">ch</span> <span style="color:#66d9ef">chan</span><span style="color:#f92672">&lt;-</span> []<span style="color:#66d9ef">byte</span>) {
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">defer</span> <span style="color:#a6e22e">wg</span>.<span style="color:#a6e22e">Done</span>()
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">defer</span> <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">cancelCtx</span>()
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">for</span> {
+</span></span><span style="display:flex;"><span>                <span style="color:#75715e">// 从conn中读取数据,且数据检验成功，拿到完整请求包
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>                <span style="color:#66d9ef">select</span> {
+</span></span><span style="display:flex;"><span>                    <span style="color:#66d9ef">case</span> <span style="color:#f92672">&lt;-</span><span style="color:#a6e22e">ctx</span>.<span style="color:#a6e22e">Done</span>():   <span style="color:#75715e">// 检测是否有终止操作
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>                        <span style="color:#a6e22e">SysLog</span>(<span style="color:#e6db74">&#34;tcp read routine context done:&#34;</span>, <span style="color:#a6e22e">ctx</span>.<span style="color:#a6e22e">Err</span>())
+</span></span><span style="display:flex;"><span>                        <span style="color:#66d9ef">return</span>
+</span></span><span style="display:flex;"><span>                    <span style="color:#75715e">// ...
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>                  }
+</span></span><span style="display:flex;"><span>                  <span style="color:#75715e">// 其他     
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>              }
+</span></span><span style="display:flex;"><span>  }(<span style="color:#a6e22e">ctx</span>, <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">cin</span>)       
+</span></span></code></pre></div><p>work里，会根据配置文件里timeout字段，来创建一个timerCtx，并把它作为srf调用的总超时，以此来控制后端所有调用。ctx是传入的cancelCtx，来控制work本身的终止。新创建的subCtx是一个timerCtx，来控制srf调动的终止，这个subCtx会传入jce生成的.go桩文件接口中。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#75715e">// 处理客户端请求
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#66d9ef">go</span> <span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">ctx</span> <span style="color:#a6e22e">context</span>.<span style="color:#a6e22e">Context</span>, <span style="color:#a6e22e">in</span> <span style="color:#f92672">&lt;-</span><span style="color:#66d9ef">chan</span> []<span style="color:#66d9ef">byte</span>, <span style="color:#a6e22e">out</span> <span style="color:#66d9ef">chan</span><span style="color:#f92672">&lt;-</span> []<span style="color:#66d9ef">byte</span>) {
+</span></span><span style="display:flex;"><span>      <span style="color:#75715e">// defer and recover
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>      <span style="color:#66d9ef">for</span> {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">select</span> {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">case</span> <span style="color:#f92672">&lt;-</span><span style="color:#a6e22e">ctx</span>.<span style="color:#a6e22e">Done</span>():
+</span></span><span style="display:flex;"><span>          <span style="color:#a6e22e">SysLog</span>(<span style="color:#e6db74">&#34;tcp handle routine context done:&#34;</span>, <span style="color:#a6e22e">ctx</span>.<span style="color:#a6e22e">Err</span>())
+</span></span><span style="display:flex;"><span>          <span style="color:#66d9ef">return</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">case</span> <span style="color:#a6e22e">req</span> <span style="color:#f92672">:=</span> <span style="color:#f92672">&lt;-</span><span style="color:#a6e22e">in</span>:
+</span></span><span style="display:flex;"><span>          <span style="color:#66d9ef">go</span> <span style="color:#66d9ef">func</span>() {
+</span></span><span style="display:flex;"><span>            <span style="color:#a6e22e">subctx</span>, <span style="color:#a6e22e">cancel</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">context</span>.<span style="color:#a6e22e">WithTimeout</span>(<span style="color:#a6e22e">ctx</span>, <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">server</span>.<span style="color:#a6e22e">msgTimeout</span>)
+</span></span><span style="display:flex;"><span>            <span style="color:#a6e22e">rsp</span>, <span style="color:#a6e22e">e</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">server</span>.<span style="color:#a6e22e">handler</span>.<span style="color:#a6e22e">Serve</span>(<span style="color:#a6e22e">subctx</span>, <span style="color:#a6e22e">req</span>)
+</span></span><span style="display:flex;"><span>            <span style="color:#a6e22e">cancel</span>()
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// ...
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">cout</span> <span style="color:#f92672">&lt;-</span> <span style="color:#a6e22e">rsp</span>
+</span></span><span style="display:flex;"><span>          }()
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>      }
+</span></span><span style="display:flex;"><span>    }(<span style="color:#a6e22e">ctx</span>, <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">cin</span>, <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">cout</span>)
+</span></span></code></pre></div><p>write里，也通过ctx来控制终止。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#75715e">// 向客户端回包
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">go</span> <span style="color:#66d9ef">func</span>(<span style="color:#a6e22e">ctx</span> <span style="color:#a6e22e">context</span>.<span style="color:#a6e22e">Context</span>, <span style="color:#a6e22e">ch</span> <span style="color:#f92672">&lt;-</span><span style="color:#66d9ef">chan</span> []<span style="color:#66d9ef">byte</span>) {
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">defer</span> <span style="color:#a6e22e">wg</span>.<span style="color:#a6e22e">Done</span>()
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">defer</span> <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">cancelCtx</span>()
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">for</span> {
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">select</span> {
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">case</span> <span style="color:#f92672">&lt;-</span><span style="color:#a6e22e">ctx</span>.<span style="color:#a6e22e">Done</span>():
+</span></span><span style="display:flex;"><span>			<span style="color:#a6e22e">SysLog</span>(<span style="color:#e6db74">&#34;tcp write routine context done:&#34;</span>, <span style="color:#a6e22e">ctx</span>.<span style="color:#a6e22e">Err</span>())
+</span></span><span style="display:flex;"><span>			<span style="color:#66d9ef">return</span>
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e">// 回包逻辑
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>		}
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>}(<span style="color:#a6e22e">ctx</span>, <span style="color:#a6e22e">c</span>.<span style="color:#a6e22e">cout</span>)
+</span></span></code></pre></div><p>当srf服务又作为客户端去调用其他srf服务时，work里的timerCtx会进入srfClient的Invoke接口。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> (<span style="color:#a6e22e">_obj</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">MooTagSvrProxy</span>) <span style="color:#a6e22e">AddTag</span>(<span style="color:#a6e22e">ctx</span> <span style="color:#a6e22e">context</span>.<span style="color:#a6e22e">Context</span>, <span style="color:#a6e22e">req</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">AddTagReq</span>,<span style="color:#a6e22e">rsp</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">AddTagRsp</span>,<span style="color:#a6e22e">_opt</span> <span style="color:#f92672">...</span><span style="color:#66d9ef">map</span>[<span style="color:#66d9ef">string</span>]<span style="color:#66d9ef">string</span> )(<span style="color:#a6e22e">_ret</span> <span style="color:#66d9ef">int32</span>,<span style="color:#a6e22e">_err</span> <span style="color:#66d9ef">error</span>){ 
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// ...
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#a6e22e">_resp</span>, <span style="color:#a6e22e">_err</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">_obj</span>.<span style="color:#a6e22e">SrfClient</span>.<span style="color:#a6e22e">Invoke</span>(<span style="color:#a6e22e">ctx</span>, <span style="color:#a6e22e">srf</span>.<span style="color:#a6e22e">JCENORMAL</span>, <span style="color:#e6db74">&#34;AddTag&#34;</span>, <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">reqBuffer</span>, <span style="color:#a6e22e">_opt</span><span style="color:#f92672">...</span>)
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> <span style="color:#a6e22e">_err</span> <span style="color:#f92672">!=</span> <span style="color:#66d9ef">nil</span> {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">_ret</span>,<span style="color:#a6e22e">_err</span>
+</span></span><span style="display:flex;"><span>    }   
+</span></span><span style="display:flex;"><span>   <span style="color:#75715e">// 其他...
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>}
+</span></span></code></pre></div><p>Invode最终会调用client.DoRequests接口，DoRequests会以配置文件中设置的被调服务的超时时间来创建一个新的timerCtx。如果在超时时间内，doRequest返回，则调用终止函数，表示自然终止；否则超时过后，timer.Time回调事件中会以超时终止。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-go" data-lang="go"><span style="display:flex;"><span><span style="color:#66d9ef">func</span> <span style="color:#a6e22e">DoRequests</span>(<span style="color:#a6e22e">ctx</span> <span style="color:#a6e22e">context</span>.<span style="color:#a6e22e">Context</span>, <span style="color:#a6e22e">reqs</span> <span style="color:#f92672">...</span><span style="color:#a6e22e">Requestor</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// ...
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#a6e22e">done</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">isDone</span>(<span style="color:#a6e22e">ctx</span>)
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// ... 
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#a6e22e">reqInfo</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">NewReqInfoFromDSN</span>(<span style="color:#a6e22e">req</span>.<span style="color:#a6e22e">DataSourceName</span>())
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">c</span>, <span style="color:#a6e22e">f</span> <span style="color:#f92672">:=</span> <span style="color:#a6e22e">context</span>.<span style="color:#a6e22e">WithTimeout</span>(<span style="color:#a6e22e">ctx</span>, <span style="color:#a6e22e">reqInfo</span>.<span style="color:#a6e22e">Timeout</span>)
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">doRequest</span>(<span style="color:#a6e22e">c</span>, <span style="color:#a6e22e">req</span>, <span style="color:#a6e22e">reqInfo</span>)
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">f</span>()    
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">//
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>}
+</span></span></code></pre></div><p>而doRequest也会在拿到ip/port、连接建立成功、发送完数据、接收完数据四个阶段来判断是否要终止。</p>
+<p>PS：这里要注意，因为read,work,write三个协程是用同一个ctx来控制的，所以如果对端关闭了连接，read协程在退出时的defer中会调用该ctx的cancel。所以在类似于下面这种场景下会有点问题：离线工具client是sendOnly模式请求后端，可能会使得work协程提前关闭。</p>
+<h2 id="72-client端context的使用">7.2 client端context的使用</h2>
+<p><img src="https://km.woa.com/asset/d5fcf17d414c4099b0602a78450ad13a?height=548&amp;width=1100" alt=""></p>
+<p>所以，我们在使用going框架写后台服务时，如果把生成的.go文件里的ctx传给下游的各个服务、各个存储的rpc里，可以做到统一控制各个上游服务的请求的流程，避免资源浪费。</p>
+<ul class="pa0">
+  
+</ul>
+<div class="mt6 instapaper_ignoref">
+      
+      
+      </div>
+    </div>
+
+    <aside class="w-30-l mt6-l">
+
+
+
+
+</aside>
+
+  </article>
+
+    </main>
+    <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
+  <div class="flex justify-between">
+  <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/" >
+    &copy;  0xSaber.io 2024 
+  </a>
+    <div>
+<div class="ananke-socials">
+  
+</div>
+</div>
+  </div>
+</footer>
+
+  </body>
+</html>
