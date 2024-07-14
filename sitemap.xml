@@ -2,14 +2,26 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://raoxuanxuan.github.io/articles/</loc>
+    <loc>http://localhost:1313/articles/</loc>
+    <lastmod>2024-07-14T22:17:33+08:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/articles/backend/</loc>
+    <lastmod>2024-07-14T22:17:33+08:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/articles/backend/%E5%85%A8%E9%93%BE%E8%B7%AF%E5%8E%8B%E6%B5%8B%E7%BB%BC%E8%BF%B0/</loc>
+    <lastmod>2024-07-14T22:17:33+08:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/articles/backend/%E9%87%8D%E8%AF%95/</loc>
+    <lastmod>2024-07-14T22:11:25+08:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/articles/golang/context%E8%A7%A3%E6%9E%90/</loc>
     <lastmod>2024-07-14T21:53:17+08:00</lastmod>
   </url><url>
-    <loc>https://raoxuanxuan.github.io/articles/golang/</loc>
+    <loc>http://localhost:1313/articles/golang/</loc>
     <lastmod>2024-07-14T21:53:17+08:00</lastmod>
   </url><url>
-    <loc>https://raoxuanxuan.github.io/articles/categories/</loc>
+    <loc>http://localhost:1313/articles/categories/</loc>
   </url><url>
-    <loc>https://raoxuanxuan.github.io/articles/tags/</loc>
+    <loc>http://localhost:1313/articles/tags/</loc>
   </url>
 </urlset>

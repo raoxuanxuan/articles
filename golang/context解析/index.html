@@ -1,12 +1,123 @@
-<!DOCTYPE html>
-<html lang="en-us">
-  <head><script src="/articles/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=articles/livereload" data-no-instant defer></script>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<!doctype html>
+<html
+  dir="ltr"
+  lang="en"
+  data-theme=""
+  
+    class="html theme--light"
+  
+><head><script src="/articles/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=articles/livereload" data-no-instant defer></script>
+  <meta charset="utf-8" />
+  <title>
+    saberrao
+        |
+        Context解析
+      
+
     
-    <title>Context解析 | 0xSaber.io</title>
-    <meta name="viewport" content="width=device-width,minimum-scale=1">
-    <meta name="description" content="1. go context是什么 一句话描述：go context是一个在gorouting间传递终止信号、做超时控制、传递请求数据的方案。
+
+  </title>
+
+  <meta name="generator" content="Hugo 0.128.2"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="author" content="saberrao" />
+  <meta
+    name="description"
+    content="我是程序员saberrao"
+  />
+  
+  
+    
+    
+    <link
+      rel="stylesheet"
+      href="/articles/scss/main.min.3925fb4b6af87775475dd66e73fa8c2d2c6650e110af1892b64dec2ebfc30fa8.css"
+      integrity="sha256-OSX7S2r4d3VHXdZuc/qMLSxmUOEQrxiStk3sLr/DD6g="
+      crossorigin="anonymous"
+      type="text/css"
+    />
+  
+
+  
+  <link
+    rel="stylesheet"
+    href="/articles/css/markupHighlight.min.73ccfdf28df555e11009c13c20ced067af3cb021504cba43644c705930428b00.css"
+    integrity="sha256-c8z98o31VeEQCcE8IM7QZ688sCFQTLpDZExwWTBCiwA="
+    crossorigin="anonymous"
+    type="text/css"
+  />
+  
+  
+  <link
+    rel="stylesheet"
+    href="/articles/fontawesome/css/fontawesome.min.137b1cf3cea9a8adb7884343a9a5ddddf4280f59153f74dc782fb7f7bf0d0519.css"
+    integrity="sha256-E3sc886pqK23iENDqaXd3fQoD1kVP3TceC&#43;3978NBRk="
+    crossorigin="anonymous"
+    type="text/css"
+  />
+  
+  <link
+    rel="stylesheet"
+    href="/articles/fontawesome/css/solid.min.e65dc5b48fb5f39b142360c57c3a215744c94e56c755c929cc3e88fe12aab4d3.css"
+    integrity="sha256-5l3FtI&#43;185sUI2DFfDohV0TJTlbHVckpzD6I/hKqtNM="
+    crossorigin="anonymous"
+    type="text/css"
+  />
+  
+  <link
+    rel="stylesheet"
+    href="/articles/fontawesome/css/regular.min.6f4f16d58da1c82c0c3a3436e021a3d39b4742f741192c546e73e947eacfd92f.css"
+    integrity="sha256-b08W1Y2hyCwMOjQ24CGj05tHQvdBGSxUbnPpR&#43;rP2S8="
+    crossorigin="anonymous"
+    type="text/css"
+  />
+  
+  <link
+    rel="stylesheet"
+    href="/articles/fontawesome/css/brands.min.e10425ad768bc98ff1fb272a0ac8420f9d1ba22f0612c08ff1010c95080ffe7e.css"
+    integrity="sha256-4QQlrXaLyY/x&#43;ycqCshCD50boi8GEsCP8QEMlQgP/n4="
+    crossorigin="anonymous"
+    type="text/css"
+  />
+  
+  <link rel="shortcut icon" href="/articles/favicon.ico" type="image/x-icon" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/articles/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/articles/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/articles/favicon-16x16.png" />
+
+  <link rel="canonical" href="http://localhost:1313/articles/golang/context%E8%A7%A3%E6%9E%90/" />
+
+  
+  
+  
+  
+  <script
+    type="text/javascript"
+    src="/articles/js/anatole-header.min.f9132794301a01ff16550ed66763482bd848f62243d278f5e550229a158bfd32.js"
+    integrity="sha256-&#43;RMnlDAaAf8WVQ7WZ2NIK9hI9iJD0nj15VAimhWL/TI="
+    crossorigin="anonymous"
+  ></script>
+
+  
+    
+    
+    <script
+      type="text/javascript"
+      src="/articles/js/anatole-theme-switcher.min.d6d329d93844b162e8bed1e915619625ca91687952177552b9b3e211014a2957.js"
+      integrity="sha256-1tMp2ThEsWLovtHpFWGWJcqRaHlSF3VSubPiEQFKKVc="
+      crossorigin="anonymous"
+    ></script>
+  
+
+  
+
+  
+
+
+  
+  
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Context解析">
+  <meta name="twitter:description" content="1. go context是什么 一句话描述：go context是一个在gorouting间传递终止信号、做超时控制、传递请求数据的方案。
 2. 为什么有go context 传递请求数据比较简单， 传递终止信号和做超时控制都是为了更优雅的终止掉一个gorouting。为什么需要研究如何终止一个gorouting的问题？
 因为后台服务往往是组合式的命令请求：一个客户端的请求到后台后，需要查询多个下游服务，并把下游服务的返回结果做一定的逻辑运算，然后拼接组合起来返回给客户端。如下图所示： 假设客户端和业务后台mySvr的超时设定是800ms，mySvr串行访问upstreamSvr1和upstreamSvr2两个上游服务，下面个两种场景存在资源的浪费：
 mySvr内有个耗时的操作，花了900ms。此时，800ms过后，client已经认为超时，弃掉这次请求的数据，mySvr再对upstreamSvr1和upstreamSvr2的请求已经无效。 upstreamSvr1有耗时操作，导致upStreamSvr2还没请求时已经超过了800ms的总耗时，此时client认为超时，mySvr再请求upstreamSvr2已经意义了，造成UpsgreamSvr2的资源浪费。 这两种情况都需要提前停止掉浪费的操作，那么当能够取消一个gorouting或中途终止一个gorouting，那么就可以避免资源浪费。
@@ -14,34 +125,11 @@ mySvr内有个耗时的操作，花了900ms。此时，800ms过后，client已�
 每个请求都在自己的gorouting中执行 处理请求的gorouting又会启动其他gorouting访问下游服务，这些goorouting都有两个特性： 需要一些request-specific的数据，比如uin，client-ip，token等 顶层gorouting被终止(如客户端断开)或超时，下层gorouting就没有再运行的意义 传递数据这个比较简单，而对于传递终止信号结束掉gorouting来说，如果没有context，我们看看应该如何做? 全局channel&#43;select的方式可以完成，如下：
 package main import ( &#34;fmt&#34; &#34;sync&#34; &#34;time&#34; ) var stop = make(chan string) func main() { var wg sync.WaitGroup wg.Add(1) go func() { defer wg.Done() select { case action := &lt;-stop: fmt.Println(action, &#34; gorouting&#34;) } }() time.AfterFunc(time.Second*2, func() { stop &lt;- &#34;stop&#34; }) wg.Wait() } main在2秒后向匿名gorouting中通过全局channel的方式来终止匿名gorouting的运行。这种方式是最简单的做法，当需要控制多个gorouting时，需要多个全局channel。而当gorouting中又起了新的gorouting时，通过这种方式来控制gorouting的终止就变的非常复杂。
 2. go中context的实现 说到底，context实际上还是用select&#43;channel的模式，但是增加了从顶传递、超时判断、数据携带等逻辑，最关键的是让gorouting的终止变得统一控制。">
-    <meta name="generator" content="Hugo 0.128.2">
-    
-    
-    
-    
-      <meta name="robots" content="noindex, nofollow">
-    
-    
-
-    
-<link rel="stylesheet" href="/articles/ananke/css/main.min.css" >
 
 
 
-    
-
-    
-      
-
-    
-
-    
-
-    
-      <link rel="canonical" href="http://localhost:1313/articles/golang/context%E8%A7%A3%E6%9E%90/">
-    
-
-    <meta property="og:url" content="http://localhost:1313/articles/golang/context%E8%A7%A3%E6%9E%90/">
+  
+  <meta property="og:url" content="http://localhost:1313/articles/golang/context%E8%A7%A3%E6%9E%90/">
   <meta property="og:site_name" content="0xSaber.io">
   <meta property="og:title" content="Context解析">
   <meta property="og:description" content="1. go context是什么 一句话描述：go context是一个在gorouting间传递终止信号、做超时控制、传递请求数据的方案。
@@ -58,101 +146,204 @@ package main import ( &#34;fmt&#34; &#34;sync&#34; &#34;time&#34; ) var stop = m
     <meta property="article:published_time" content="2024-07-14T21:53:17+08:00">
     <meta property="article:modified_time" content="2024-07-14T21:53:17+08:00">
 
-  <meta itemprop="name" content="Context解析">
-  <meta itemprop="description" content="1. go context是什么 一句话描述：go context是一个在gorouting间传递终止信号、做超时控制、传递请求数据的方案。
-2. 为什么有go context 传递请求数据比较简单， 传递终止信号和做超时控制都是为了更优雅的终止掉一个gorouting。为什么需要研究如何终止一个gorouting的问题？
-因为后台服务往往是组合式的命令请求：一个客户端的请求到后台后，需要查询多个下游服务，并把下游服务的返回结果做一定的逻辑运算，然后拼接组合起来返回给客户端。如下图所示： 假设客户端和业务后台mySvr的超时设定是800ms，mySvr串行访问upstreamSvr1和upstreamSvr2两个上游服务，下面个两种场景存在资源的浪费：
-mySvr内有个耗时的操作，花了900ms。此时，800ms过后，client已经认为超时，弃掉这次请求的数据，mySvr再对upstreamSvr1和upstreamSvr2的请求已经无效。 upstreamSvr1有耗时操作，导致upStreamSvr2还没请求时已经超过了800ms的总耗时，此时client认为超时，mySvr再请求upstreamSvr2已经意义了，造成UpsgreamSvr2的资源浪费。 这两种情况都需要提前停止掉浪费的操作，那么当能够取消一个gorouting或中途终止一个gorouting，那么就可以避免资源浪费。
-特别对于go服务来说，它的特点比较明显：
-每个请求都在自己的gorouting中执行 处理请求的gorouting又会启动其他gorouting访问下游服务，这些goorouting都有两个特性： 需要一些request-specific的数据，比如uin，client-ip，token等 顶层gorouting被终止(如客户端断开)或超时，下层gorouting就没有再运行的意义 传递数据这个比较简单，而对于传递终止信号结束掉gorouting来说，如果没有context，我们看看应该如何做? 全局channel&#43;select的方式可以完成，如下：
-package main import ( &#34;fmt&#34; &#34;sync&#34; &#34;time&#34; ) var stop = make(chan string) func main() { var wg sync.WaitGroup wg.Add(1) go func() { defer wg.Done() select { case action := &lt;-stop: fmt.Println(action, &#34; gorouting&#34;) } }() time.AfterFunc(time.Second*2, func() { stop &lt;- &#34;stop&#34; }) wg.Wait() } main在2秒后向匿名gorouting中通过全局channel的方式来终止匿名gorouting的运行。这种方式是最简单的做法，当需要控制多个gorouting时，需要多个全局channel。而当gorouting中又起了新的gorouting时，通过这种方式来控制gorouting的终止就变的非常复杂。
-2. go中context的实现 说到底，context实际上还是用select&#43;channel的模式，但是增加了从顶传递、超时判断、数据携带等逻辑，最关键的是让gorouting的终止变得统一控制。">
-  <meta itemprop="datePublished" content="2024-07-14T21:53:17+08:00">
-  <meta itemprop="dateModified" content="2024-07-14T21:53:17+08:00">
-  <meta itemprop="wordCount" content="1013">
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Context解析">
-  <meta name="twitter:description" content="1. go context是什么 一句话描述：go context是一个在gorouting间传递终止信号、做超时控制、传递请求数据的方案。
-2. 为什么有go context 传递请求数据比较简单， 传递终止信号和做超时控制都是为了更优雅的终止掉一个gorouting。为什么需要研究如何终止一个gorouting的问题？
-因为后台服务往往是组合式的命令请求：一个客户端的请求到后台后，需要查询多个下游服务，并把下游服务的返回结果做一定的逻辑运算，然后拼接组合起来返回给客户端。如下图所示： 假设客户端和业务后台mySvr的超时设定是800ms，mySvr串行访问upstreamSvr1和upstreamSvr2两个上游服务，下面个两种场景存在资源的浪费：
-mySvr内有个耗时的操作，花了900ms。此时，800ms过后，client已经认为超时，弃掉这次请求的数据，mySvr再对upstreamSvr1和upstreamSvr2的请求已经无效。 upstreamSvr1有耗时操作，导致upStreamSvr2还没请求时已经超过了800ms的总耗时，此时client认为超时，mySvr再请求upstreamSvr2已经意义了，造成UpsgreamSvr2的资源浪费。 这两种情况都需要提前停止掉浪费的操作，那么当能够取消一个gorouting或中途终止一个gorouting，那么就可以避免资源浪费。
-特别对于go服务来说，它的特点比较明显：
-每个请求都在自己的gorouting中执行 处理请求的gorouting又会启动其他gorouting访问下游服务，这些goorouting都有两个特性： 需要一些request-specific的数据，比如uin，client-ip，token等 顶层gorouting被终止(如客户端断开)或超时，下层gorouting就没有再运行的意义 传递数据这个比较简单，而对于传递终止信号结束掉gorouting来说，如果没有context，我们看看应该如何做? 全局channel&#43;select的方式可以完成，如下：
-package main import ( &#34;fmt&#34; &#34;sync&#34; &#34;time&#34; ) var stop = make(chan string) func main() { var wg sync.WaitGroup wg.Add(1) go func() { defer wg.Done() select { case action := &lt;-stop: fmt.Println(action, &#34; gorouting&#34;) } }() time.AfterFunc(time.Second*2, func() { stop &lt;- &#34;stop&#34; }) wg.Wait() } main在2秒后向匿名gorouting中通过全局channel的方式来终止匿名gorouting的运行。这种方式是最简单的做法，当需要控制多个gorouting时，需要多个全局channel。而当gorouting中又起了新的gorouting时，通过这种方式来控制gorouting的终止就变的非常复杂。
-2. go中context的实现 说到底，context实际上还是用select&#43;channel的模式，但是增加了从顶传递、超时判断、数据携带等逻辑，最关键的是让gorouting的终止变得统一控制。">
 
-	
-  </head>
 
-  <body class="ma0 avenir bg-near-white">
+  
+  
+  
+  
+  <script type="application/ld+json">
+    {
+        "@context": "http://schema.org",
+        "@type": "BlogPosting",
+        "articleSection": "golang",
+        "name": "Context解析",
+        "headline": "Context解析",
+        "alternativeHeadline": "",
+        "description": "
+      
+        1. go context是什么 一句话描述：go context是一个在gorouting间传递终止信号、做超时控制、传递请求数据的方案。\n2. 为什么有go context 传递请求数据比较简单， 传递终止信号和做超时控制都是为了更优雅的终止掉一个gorouting。为什么需要研究如何终止一个gorouting的问题？\n因为后台服务往往是组合式的命令请求：一个客户端的请求到后台后，需要查询多个下游服务，并把下游服务的返回结果做一定的逻辑运算，然后拼接组合起来返回给客户端。如下图所示： 假设客户端和业务后台mySvr的超时设定是800ms，mySvr串行访问upstreamSvr1和upstreamSvr2两个上游服务，下面个两种场景存在资源的浪费：\nmySvr内有个耗时的操作，花了900ms。此时，800ms过后，client已经认为超时，弃掉这次请求的数据，mySvr再对upstreamSvr1和upstreamSvr2的请求已经无效。 upstreamSvr1有耗时操作，导致upStreamSvr2还没请求时已经超过了800ms的总耗时，此时client认为超时，mySvr再请求upstreamSvr2已经意义了，造成UpsgreamSvr2的资源浪费。 这两种情况都需要提前停止掉浪费的操作，那么当能够取消一个gorouting或中途终止一个gorouting，那么就可以避免资源浪费。\n特别对于go服务来说，它的特点比较明显：\n每个请求都在自己的gorouting中执行 处理请求的gorouting又会启动其他gorouting访问下游服务，这些goorouting都有两个特性： 需要一些request-specific的数据，比如uin，client-ip，token等 顶层gorouting被终止(如客户端断开)或超时，下层gorouting就没有再运行的意义 传递数据这个比较简单，而对于传递终止信号结束掉gorouting来说，如果没有context，我们看看应该如何做? 全局channel\u002bselect的方式可以完成，如下：\npackage main import ( \u0026#34;fmt\u0026#34; \u0026#34;sync\u0026#34; \u0026#34;time\u0026#34; ) var stop = make(chan string) func main() { var wg sync.WaitGroup wg.Add(1) go func() { defer wg.Done() select { case action := \u0026lt;-stop: fmt.Println(action, \u0026#34; gorouting\u0026#34;) } }() time.AfterFunc(time.Second*2, func() { stop \u0026lt;- \u0026#34;stop\u0026#34; }) wg.Wait() } main在2秒后向匿名gorouting中通过全局channel的方式来终止匿名gorouting的运行。这种方式是最简单的做法，当需要控制多个gorouting时，需要多个全局channel。而当gorouting中又起了新的gorouting时，通过这种方式来控制gorouting的终止就变的非常复杂。\n2. go中context的实现 说到底，context实际上还是用select\u002bchannel的模式，但是增加了从顶传递、超时判断、数据携带等逻辑，最关键的是让gorouting的终止变得统一控制。
 
+
+      
+
+
+    ",
+        "inLanguage": "en-us",
+        "isFamilyFriendly": "true",
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "http:\/\/localhost:1313\/articles\/golang\/context%E8%A7%A3%E6%9E%90\/"
+        },
+        "author" : {
+            "@type": "Person",
+            "name": "saberrao"
+        },
+        "creator" : {
+            "@type": "Person",
+            "name": "saberrao"
+        },
+        "accountablePerson" : {
+            "@type": "Person",
+            "name": "saberrao"
+        },
+        "copyrightHolder" : {
+            "@type": "Person",
+            "name": "saberrao"
+        },
+        "copyrightYear" : "2024",
+        "dateCreated": "2024-07-14T21:53:17.00Z",
+        "datePublished": "2024-07-14T21:53:17.00Z",
+        "dateModified": "2024-07-14T21:53:17.00Z",
+        "publisher":{
+            "@type":"Organization",
+            "name": "saberrao",
+            "url": "http://localhost:1313/articles/",
+            "logo": {
+                "@type": "ImageObject",
+                "url": "http:\/\/localhost:1313\/articles\/favicon-32x32.png",
+                "width":"32",
+                "height":"32"
+            }
+        },
+        "image": 
+      [
+      ]
+
+    ,
+        "url" : "http:\/\/localhost:1313\/articles\/golang\/context%E8%A7%A3%E6%9E%90\/",
+        "wordCount" : "1013",
+        "genre" : [ ],
+        "keywords" : [ ]
+    }
+  </script>
+
+
+</head>
+<body class="body">
+    <div class="wrapper">
+      <aside
+        
+          class="wrapper__sidebar"
+        
+      ><div
+  class="sidebar
+    animated fadeInDown
+  "
+>
+  <div class="sidebar__content">
+    <div class="sidebar__introduction">
+      <img
+        class="sidebar__introduction-profileimage"
+        src="/static/images/inflected.jpg"
+        alt="profile picture"
+      />
+      
+        <div class="sidebar__introduction-title">
+          <a href="/articles">Make A Difference</a>
+        </div>
+      
+      <div class="sidebar__introduction-description">
+        <p>我是程序员saberrao</p>
+      </div>
+    </div>
+    <ul class="sidebar__list">
+      
+    </ul>
+  </div><footer class="footer footer__sidebar">
+  <ul class="footer__list">
+    <li class="footer__item">
+      &copy;
+      
+        saberrao
+        2024
+      
+    </li>
     
-   
+  </ul>
+</footer>
   
+  <script
+    type="text/javascript"
+    src="/articles/js/medium-zoom.min.1248fa75275e5ef0cbef27e8c1e27dc507c445ae3a2c7d2ed0be0809555dac64.js"
+    integrity="sha256-Ekj6dSdeXvDL7yfoweJ9xQfERa46LH0u0L4ICVVdrGQ="
+    crossorigin="anonymous"
+  ></script></div>
+</aside>
+      <main
+        
+          class="wrapper__main"
+        
+      >
+        <header class="header"><div
+  class="
+    animated fadeInDown
+  "
+>
+  <a role="button" class="navbar-burger" data-target="navMenu" aria-label="menu" aria-expanded="false">
+    <span aria-hidden="true" class="navbar-burger__line"></span>
+    <span aria-hidden="true" class="navbar-burger__line"></span>
+    <span aria-hidden="true" class="navbar-burger__line"></span>
+  </a>
+  <nav class="nav">
+    <ul class="nav__list" id="navMenu">
+      
+      
+        
+        
+          <li class="nav__list-item">
+            
+            <a
+              
+              href="/articles/golang"
+              
+              title=""
+              >Go语言</a
+            >
+          </li>
+        
 
-  <header>
-    <div class="bg-black">
-      <nav class="pv3 ph3 ph4-ns" role="navigation">
-  <div class="flex-l justify-between items-center center">
-    <a href="/articles/" class="f3 fw2 hover-white no-underline white-90 dib">
       
-        0xSaber.io
-      
-    </a>
-    <div class="flex-l items-center">
-      
+        
+        
+          <li class="nav__list-item">
+            
+            <a
+              
+              href="/articles/backend"
+              
+              title=""
+              >后端技术</a
+            >
+          </li>
+        
 
       
+    </ul>
+    <ul class="nav__list nav__list--end">
       
-<div class="ananke-socials">
-  
+      
+        <li class="nav__list-item">
+          <div class="themeswitch">
+            <a title="Switch Theme">
+              <i class="fas fa-adjust fa-fw" aria-hidden="true"></i>
+            </a>
+          </div>
+        </li>
+      
+    </ul>
+  </nav>
 </div>
-
-    </div>
-  </div>
-</nav>
-
-    </div>
-  </header>
-
-
-
-    <main class="pb7" role="main">
-      
-  
-  <article class="flex-l flex-wrap justify-between mw8 center ph3">
-    <header class="mt4 w-100">
-      <aside class="instapaper_ignoref b helvetica tracked ttu">
-          
-        Golangs
-      </aside>
-      
-
-
-
-
-
-
-
-
-
-
-  <div id="sharing" class="mt3 ananke-socials">
+</header>
+  <div
+    class="post 
+      animated fadeInDown
+    "
+  >
     
-  </div>
-
-
-      <h1 class="f1 athelas mt3 mb1">Context解析</h1>
-      
-      
-      
-      <time class="f6 mv4 dib tracked" datetime="2024-07-14T21:53:17+08:00">July 14, 2024</time>
-      
-
-      
-      
-    </header>
-    <div class="nested-copy-line-height lh-copy serif f4 nested-links mid-gray pr4-l w-two-thirds-l"><h1 id="1-go-context是什么">1. go context是什么</h1>
+    <div class="post__content">
+      <h1>Context解析</h1>
+      <h1 id="1-go-context是什么">1. go context是什么</h1>
 <p>一句话描述：go context是一个在gorouting间传递终止信号、做超时控制、传递请求数据的方案。</p>
 <h1 id="2-为什么有go-context">2. 为什么有go context</h1>
 <p>传递请求数据比较简单， 传递终止信号和做超时控制都是为了更优雅的终止掉一个gorouting。为什么需要研究如何终止一个gorouting的问题？</p>
@@ -657,37 +848,34 @@ WithCancel具体是如何做的的呢？</p>
 <h2 id="72-client端context的使用">7.2 client端context的使用</h2>
 <p><img src="https://km.woa.com/asset/d5fcf17d414c4099b0602a78450ad13a?height=548&amp;width=1100" alt=""></p>
 <p>所以，我们在使用going框架写后台服务时，如果把生成的.go文件里的ctx传给下游的各个服务、各个存储的rpc里，可以做到统一控制各个上游服务的请求的流程，避免资源浪费。</p>
-<ul class="pa0">
-  
-</ul>
-<div class="mt6 instapaper_ignoref">
+</div>
+    <div class="post__footer">
       
+
       
-      </div>
     </div>
 
-    <aside class="w-30-l mt6-l">
-
-
-
-
-</aside>
-
-  </article>
-
-    </main>
-    <footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
-  <div class="flex justify-between">
-  <a class="f4 fw4 hover-white no-underline white-70 dn dib-ns pv2 ph3" href="http://localhost:1313/articles/" >
-    &copy;  0xSaber.io 2024 
-  </a>
-    <div>
-<div class="ananke-socials">
-  
-</div>
-</div>
+    
   </div>
-</footer>
 
-  </body>
+      </main>
+    </div><footer class="footer footer__base">
+  <ul class="footer__list">
+    <li class="footer__item">
+      &copy;
+      
+        saberrao
+        2024
+      
+    </li>
+    
+  </ul>
+</footer>
+  
+  <script
+    type="text/javascript"
+    src="/articles/js/medium-zoom.min.1248fa75275e5ef0cbef27e8c1e27dc507c445ae3a2c7d2ed0be0809555dac64.js"
+    integrity="sha256-Ekj6dSdeXvDL7yfoweJ9xQfERa46LH0u0L4ICVVdrGQ="
+    crossorigin="anonymous"
+  ></script></body>
 </html>
