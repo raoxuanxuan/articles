@@ -2,50 +2,10 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>0xSaber.io</title>
-    <link>http://localhost:1313/articles/</link>
+    <link>https://raoxuanxuan.github.io/articles/</link>
     <description>Recent content on 0xSaber.io</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Sun, 14 Jul 2024 22:17:33 +0800</lastBuildDate><atom:link href="http://localhost:1313/articles/index.xml" rel="self" type="application/rss+xml" />
-    <item>
-      <title>全链路压测综述</title>
-      <link>http://localhost:1313/articles/backend/%E5%85%A8%E9%93%BE%E8%B7%AF%E5%8E%8B%E6%B5%8B%E7%BB%BC%E8%BF%B0/</link>
-      <pubDate>Sun, 14 Jul 2024 22:17:33 +0800</pubDate>
-      
-      <guid>http://localhost:1313/articles/backend/%E5%85%A8%E9%93%BE%E8%B7%AF%E5%8E%8B%E6%B5%8B%E7%BB%BC%E8%BF%B0/</guid>
-      
-        <description>全链路压测系统在业界已经是通识了，各家公司也有不少实践。本文由点到面讲清楚QQ音乐在全链路压测系统上的实践。如果你也有想法，可以仿照我们的思路复制一个这样的系统，应用在自己的业务中。</description>
-      
-    </item>
-    
-    <item>
-      <title>重试</title>
-      <link>http://localhost:1313/articles/backend/%E9%87%8D%E8%AF%95/</link>
-      <pubDate>Sun, 14 Jul 2024 22:11:25 +0800</pubDate>
-      
-      <guid>http://localhost:1313/articles/backend/%E9%87%8D%E8%AF%95/</guid>
-      
-        <description>从客户端和网关的全局视角来看看如何做重试</description>
-      
-    </item>
-    
-    <item>
-      <title>Context解析</title>
-      <link>http://localhost:1313/articles/golang/context%E8%A7%A3%E6%9E%90/</link>
-      <pubDate>Sun, 14 Jul 2024 21:53:17 +0800</pubDate>
-      
-      <guid>http://localhost:1313/articles/golang/context%E8%A7%A3%E6%9E%90/</guid>
-      
-        <description>1. go context是什么 一句话描述：go context是一个在gorouting间传递终止信号、做超时控制、传递请求数据的方案。
-2. 为什么有go context 传递请求数据比较简单， 传递终止信号和做超时控制都是为了更优雅的终止掉一个gorouting。为什么需要研究如何终止一个gorouting的问题？
-因为后台服务往往是组合式的命令请求：一个客户端的请求到后台后，需要查询多个下游服务，并把下游服务的返回结果做一定的逻辑运算，然后拼接组合起来返回给客户端。如下图所示： 假设客户端和业务后台mySvr的超时设定是800ms，mySvr串行访问upstreamSvr1和upstreamSvr2两个上游服务，下面个两种场景存在资源的浪费：
-mySvr内有个耗时的操作，花了900ms。此时，800ms过后，client已经认为超时，弃掉这次请求的数据，mySvr再对upstreamSvr1和upstreamSvr2的请求已经无效。 upstreamSvr1有耗时操作，导致upStreamSvr2还没请求时已经超过了800ms的总耗时，此时client认为超时，mySvr再请求upstreamSvr2已经意义了，造成UpsgreamSvr2的资源浪费。 这两种情况都需要提前停止掉浪费的操作，那么当能够取消一个gorouting或中途终止一个gorouting，那么就可以避免资源浪费。
-特别对于go服务来说，它的特点比较明显：
-每个请求都在自己的gorouting中执行 处理请求的gorouting又会启动其他gorouting访问下游服务，这些goorouting都有两个特性： 需要一些request-specific的数据，比如uin，client-ip，token等 顶层gorouting被终止(如客户端断开)或超时，下层gorouting就没有再运行的意义 传递数据这个比较简单，而对于传递终止信号结束掉gorouting来说，如果没有context，我们看看应该如何做? 全局channel+select的方式可以完成，如下：
-package main import ( &amp;#34;fmt&amp;#34; &amp;#34;sync&amp;#34; &amp;#34;time&amp;#34; ) var stop = make(chan string) func main() { var wg sync.WaitGroup wg.Add(1) go func() { defer wg.Done() select { case action := &amp;lt;-stop: fmt.Println(action, &amp;#34; gorouting&amp;#34;) } }() time.AfterFunc(time.Second*2, func() { stop &amp;lt;- &amp;#34;stop&amp;#34; }) wg.Wait() } main在2秒后向匿名gorouting中通过全局channel的方式来终止匿名gorouting的运行。这种方式是最简单的做法，当需要控制多个gorouting时，需要多个全局channel。而当gorouting中又起了新的gorouting时，通过这种方式来控制gorouting的终止就变的非常复杂。
-2. go中context的实现 说到底，context实际上还是用select+channel的模式，但是增加了从顶传递、超时判断、数据携带等逻辑，最关键的是让gorouting的终止变得统一控制。</description>
-      
-    </item>
-    
+    <lastBuildDate>Wed, 31 Jul 2024 20:16:56 +0800</lastBuildDate><atom:link href="https://raoxuanxuan.github.io/articles/index.xml" rel="self" type="application/rss+xml" />
   </channel>
 </rss>

@@ -2,32 +2,10 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Backends on 0xSaber.io</title>
-    <link>http://localhost:1313/articles/backend/</link>
+    <link>https://raoxuanxuan.github.io/articles/backend/</link>
     <description>Recent content in Backends on 0xSaber.io</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Sun, 14 Jul 2024 22:17:33 +0800</lastBuildDate><atom:link href="http://localhost:1313/articles/backend/index.xml" rel="self" type="application/rss+xml" />
-    <item>
-      <title>全链路压测综述</title>
-      <link>http://localhost:1313/articles/backend/%E5%85%A8%E9%93%BE%E8%B7%AF%E5%8E%8B%E6%B5%8B%E7%BB%BC%E8%BF%B0/</link>
-      <pubDate>Sun, 14 Jul 2024 22:17:33 +0800</pubDate>
-      
-      <guid>http://localhost:1313/articles/backend/%E5%85%A8%E9%93%BE%E8%B7%AF%E5%8E%8B%E6%B5%8B%E7%BB%BC%E8%BF%B0/</guid>
-      
-        <description>全链路压测系统在业界已经是通识了，各家公司也有不少实践。本文由点到面讲清楚QQ音乐在全链路压测系统上的实践。如果你也有想法，可以仿照我们的思路复制一个这样的系统，应用在自己的业务中。</description>
-      
-    </item>
-    
-    <item>
-      <title>重试</title>
-      <link>http://localhost:1313/articles/backend/%E9%87%8D%E8%AF%95/</link>
-      <pubDate>Sun, 14 Jul 2024 22:11:25 +0800</pubDate>
-      
-      <guid>http://localhost:1313/articles/backend/%E9%87%8D%E8%AF%95/</guid>
-      
-        <description>从客户端和网关的全局视角来看看如何做重试</description>
-      
-    </item>
-    
+    <lastBuildDate>Sun, 14 Jul 2024 22:17:33 +0800</lastBuildDate><atom:link href="https://raoxuanxuan.github.io/articles/backend/index.xml" rel="self" type="application/rss+xml" />
   </channel>
 </rss>

@@ -1,0 +1,668 @@
+<!doctype html>
+<html
+  dir="ltr"
+  lang="en"
+  data-theme=""
+  
+    class="html theme--light"
+  
+><head><script src="/articles/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=articles/livereload" data-no-instant defer></script>
+  <meta charset="utf-8" />
+  <title>
+    saberrao
+        |
+        RESP
+      
+
+    
+
+  </title>
+
+  <meta name="generator" content="Hugo 0.128.2"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="author" content="saberrao" />
+  <meta
+    name="description"
+    content="我是程序员saberrao"
+  />
+  
+  
+    
+    
+    <link
+      rel="stylesheet"
+      href="/articles/scss/main.min.3925fb4b6af87775475dd66e73fa8c2d2c6650e110af1892b64dec2ebfc30fa8.css"
+      integrity="sha256-OSX7S2r4d3VHXdZuc/qMLSxmUOEQrxiStk3sLr/DD6g="
+      crossorigin="anonymous"
+      type="text/css"
+    />
+  
+
+  
+  <link
+    rel="stylesheet"
+    href="/articles/css/markupHighlight.min.73ccfdf28df555e11009c13c20ced067af3cb021504cba43644c705930428b00.css"
+    integrity="sha256-c8z98o31VeEQCcE8IM7QZ688sCFQTLpDZExwWTBCiwA="
+    crossorigin="anonymous"
+    type="text/css"
+  />
+  
+  
+  <link
+    rel="stylesheet"
+    href="/articles/fontawesome/css/fontawesome.min.137b1cf3cea9a8adb7884343a9a5ddddf4280f59153f74dc782fb7f7bf0d0519.css"
+    integrity="sha256-E3sc886pqK23iENDqaXd3fQoD1kVP3TceC&#43;3978NBRk="
+    crossorigin="anonymous"
+    type="text/css"
+  />
+  
+  <link
+    rel="stylesheet"
+    href="/articles/fontawesome/css/solid.min.e65dc5b48fb5f39b142360c57c3a215744c94e56c755c929cc3e88fe12aab4d3.css"
+    integrity="sha256-5l3FtI&#43;185sUI2DFfDohV0TJTlbHVckpzD6I/hKqtNM="
+    crossorigin="anonymous"
+    type="text/css"
+  />
+  
+  <link
+    rel="stylesheet"
+    href="/articles/fontawesome/css/regular.min.6f4f16d58da1c82c0c3a3436e021a3d39b4742f741192c546e73e947eacfd92f.css"
+    integrity="sha256-b08W1Y2hyCwMOjQ24CGj05tHQvdBGSxUbnPpR&#43;rP2S8="
+    crossorigin="anonymous"
+    type="text/css"
+  />
+  
+  <link
+    rel="stylesheet"
+    href="/articles/fontawesome/css/brands.min.e10425ad768bc98ff1fb272a0ac8420f9d1ba22f0612c08ff1010c95080ffe7e.css"
+    integrity="sha256-4QQlrXaLyY/x&#43;ycqCshCD50boi8GEsCP8QEMlQgP/n4="
+    crossorigin="anonymous"
+    type="text/css"
+  />
+  
+  <link rel="shortcut icon" href="/articles/favicon.ico" type="image/x-icon" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/articles/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/articles/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/articles/favicon-16x16.png" />
+
+  <link rel="canonical" href="http://localhost:1313/articles/redis/resp/" />
+
+  
+  
+  
+  
+  <script
+    type="text/javascript"
+    src="/articles/js/anatole-header.min.f9132794301a01ff16550ed66763482bd848f62243d278f5e550229a158bfd32.js"
+    integrity="sha256-&#43;RMnlDAaAf8WVQ7WZ2NIK9hI9iJD0nj15VAimhWL/TI="
+    crossorigin="anonymous"
+  ></script>
+
+  
+    
+    
+    <script
+      type="text/javascript"
+      src="/articles/js/anatole-theme-switcher.min.d6d329d93844b162e8bed1e915619625ca91687952177552b9b3e211014a2957.js"
+      integrity="sha256-1tMp2ThEsWLovtHpFWGWJcqRaHlSF3VSubPiEQFKKVc="
+      crossorigin="anonymous"
+    ></script>
+  
+
+  
+
+  
+
+
+  
+  
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="RESP">
+  <meta name="twitter:description" content="redis客户端和服务器之间使用之定义的序列化协议来交互的，称为RESP(Redis Serialization Protocol)。这个协议实现简单，人类可读，且能够被快速解析。理解它的方式，对了解redis大有帮助。">
+
+
+
+  
+  <meta property="og:url" content="http://localhost:1313/articles/redis/resp/">
+  <meta property="og:site_name" content="0xSaber.io">
+  <meta property="og:title" content="RESP">
+  <meta property="og:description" content="redis客户端和服务器之间使用之定义的序列化协议来交互的，称为RESP(Redis Serialization Protocol)。这个协议实现简单，人类可读，且能够被快速解析。理解它的方式，对了解redis大有帮助。">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="redis">
+    <meta property="article:published_time" content="2024-07-31T20:16:56+08:00">
+    <meta property="article:modified_time" content="2024-07-31T20:16:56+08:00">
+
+
+
+  
+  
+  
+  
+  <script type="application/ld+json">
+    {
+        "@context": "http://schema.org",
+        "@type": "BlogPosting",
+        "articleSection": "redis",
+        "name": "RESP",
+        "headline": "RESP",
+        "alternativeHeadline": "",
+        "description": "
+      
+        \u003cp\u003eredis客户端和服务器之间使用之定义的序列化协议来交互的，称为RESP(Redis Serialization Protocol)。这个协议实现简单，人类可读，且能够被快速解析。理解它的方式，对了解redis大有帮助。\u003c\/p\u003e
+
+
+      
+
+
+    ",
+        "inLanguage": "en-us",
+        "isFamilyFriendly": "true",
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "http:\/\/localhost:1313\/articles\/redis\/resp\/"
+        },
+        "author" : {
+            "@type": "Person",
+            "name": "saberrao"
+        },
+        "creator" : {
+            "@type": "Person",
+            "name": "saberrao"
+        },
+        "accountablePerson" : {
+            "@type": "Person",
+            "name": "saberrao"
+        },
+        "copyrightHolder" : {
+            "@type": "Person",
+            "name": "saberrao"
+        },
+        "copyrightYear" : "2024",
+        "dateCreated": "2024-07-31T20:16:56.00Z",
+        "datePublished": "2024-07-31T20:16:56.00Z",
+        "dateModified": "2024-07-31T20:16:56.00Z",
+        "publisher":{
+            "@type":"Organization",
+            "name": "saberrao",
+            "url": "http://localhost:1313/articles/",
+            "logo": {
+                "@type": "ImageObject",
+                "url": "http:\/\/localhost:1313\/articles\/favicon-32x32.png",
+                "width":"32",
+                "height":"32"
+            }
+        },
+        "image": 
+      [
+      ]
+
+    ,
+        "url" : "http:\/\/localhost:1313\/articles\/redis\/resp\/",
+        "wordCount" : "705",
+        "genre" : [ ],
+        "keywords" : [ ]
+    }
+  </script>
+
+
+</head>
+<body class="body">
+    <div class="wrapper">
+      <aside
+        
+          class="wrapper__sidebar"
+        
+      ><div
+  class="sidebar
+    animated fadeInDown
+  "
+>
+  <div class="sidebar__content">
+    <div class="sidebar__introduction">
+      <img
+        class="sidebar__introduction-profileimage"
+        src="/static/images/inflected.jpg"
+        alt="profile picture"
+      />
+      
+        <div class="sidebar__introduction-title">
+          <a href="/articles">Make A Difference</a>
+        </div>
+      
+      <div class="sidebar__introduction-description">
+        <p>我是程序员saberrao</p>
+      </div>
+    </div>
+    <ul class="sidebar__list">
+      
+    </ul>
+  </div><footer class="footer footer__sidebar">
+  <ul class="footer__list">
+    <li class="footer__item">
+      &copy;
+      
+        saberrao
+        2024
+      
+    </li>
+    
+  </ul>
+</footer>
+  
+  <script
+    type="text/javascript"
+    src="/articles/js/medium-zoom.min.1248fa75275e5ef0cbef27e8c1e27dc507c445ae3a2c7d2ed0be0809555dac64.js"
+    integrity="sha256-Ekj6dSdeXvDL7yfoweJ9xQfERa46LH0u0L4ICVVdrGQ="
+    crossorigin="anonymous"
+  ></script></div>
+</aside>
+      <main
+        
+          class="wrapper__main"
+        
+      >
+        <header class="header"><div
+  class="
+    animated fadeInDown
+  "
+>
+  <a role="button" class="navbar-burger" data-target="navMenu" aria-label="menu" aria-expanded="false">
+    <span aria-hidden="true" class="navbar-burger__line"></span>
+    <span aria-hidden="true" class="navbar-burger__line"></span>
+    <span aria-hidden="true" class="navbar-burger__line"></span>
+  </a>
+  <nav class="nav">
+    <ul class="nav__list" id="navMenu">
+      
+      
+        
+        
+          <li class="nav__list-item">
+            
+            <a
+              
+              href="/articles/golang"
+              
+              title=""
+              >Go语言</a
+            >
+          </li>
+        
+
+      
+        
+        
+          <li class="nav__list-item">
+            
+            <a
+              
+              href="/articles/redis"
+              
+              title=""
+              >Redis</a
+            >
+          </li>
+        
+
+      
+        
+        
+          <li class="nav__list-item">
+            
+            <a
+              
+              href="/articles/backend"
+              
+              title=""
+              >后端技术</a
+            >
+          </li>
+        
+
+      
+    </ul>
+    <ul class="nav__list nav__list--end">
+      
+      
+        <li class="nav__list-item">
+          <div class="themeswitch">
+            <a title="Switch Theme">
+              <i class="fas fa-adjust fa-fw" aria-hidden="true"></i>
+            </a>
+          </div>
+        </li>
+      
+    </ul>
+  </nav>
+</div>
+</header>
+  <div
+    class="post 
+      animated fadeInDown
+    "
+  >
+    
+    <div class="post__content">
+      <h1>RESP</h1>
+      <p>redis客户端和服务器之间使用之定义的序列化协议来交互的，称为RESP(Redis Serialization Protocol)。这个协议实现简单，人类可读，且能够被快速解析。理解它的方式，对了解redis大有帮助。</p>
+<p>redis客户端和服务器之间使用之定义的序列化协议来交互的，称为RESP(Redis Serialization Protocol)。这个协议实现简单，人类可读，且能够被快速解析。它支持序列化五种类型：</p>
+<ol>
+<li>简单字符串 Simple String，长度固定</li>
+<li>错误 Error</li>
+<li>整数 Integer</li>
+<li>批量字符串 Bulk String</li>
+<li>数组 Array</li>
+</ol>
+<p>客户端发出的请求被序列化成一个批量字符串的RESP数组（RESP Array of Bulk Strings），服务端发出的回复也是一个RESP字符串。</p>
+<h2 id="1-resp协议">1. RESP协议</h2>
+<p>RESP是编码是**前缀+内容+&quot;\r\n&quot;**的形式。其中，不同的类型会有不同的前缀：</p>
+<ol>
+<li>如果是简单字符串，前缀是 &ldquo;+&rdquo;</li>
+<li>如果是错误，前缀是&quot;-&quot;</li>
+<li>如果是整数，前缀是&quot;:&quot;</li>
+<li>如果是批量字符串，前缀是&quot;$&quot;（后跟着字符串长度）</li>
+<li>如果是数组，前缀是&quot;*&quot;（后跟着数组长度）</li>
+</ol>
+<p>举例来说：</p>
+<ul>
+<li>如果要发送一个&quot;OK&quot;的字符串，那么序列化后的发送数据就是：&quot;+OK\r\n&quot;</li>
+<li>如果发生了一个错误，那么序列化后的发送数据就是：&quot;-ERR xxxx&quot;</li>
+<li>如果要发送一个数值，那么序列化后的发送数据就是：&quot;:100\r\n&quot;</li>
+<li>如果要发送一个长度为6的的字符串&quot;foobar&quot;，即：&quot;$6\r\nfoobar\r\n&quot;</li>
+<li>如果要发送两个值，就会是数组形式，数组的每个元素都是一个批量字符串，即：&quot;*2\r\n$3\r\nfoo$3\r\n&quot;</li>
+</ul>
+<p>这里为什么有了简单字符串Simple String了，还有批量字符串bulk string呢？因为redis的字符串是二进制安全，所以允许bulk string中有\r\n。这样就必须要指定字符串的长度了，不能按照\r\n来解析。</p>
+<p>举一个交互的例子：LLEN命令查询一个链表对象的长度，如LLEN mylist，返回一个数值。</p>
+<p>客户端需要发送LLEN和mylist两个字符串，所以是一个数组形式，数组长度为2（*2\r\n)，数组中第一个元素LLEN是个批量字符串，长度为4（$4\r\nLLEN\r\n），第二个元素mylist是个批量字符串，长度为6（$6\r\nmylist\r\n），所以客户端发送的数据是：*2\r\n$4\r\nLLEN\r\n$6\r\nmylist\r\n</p>
+<p>服务端查询后，长度为1000，这是一个整数，则返回的数据：:1000\r\n</p>
+<p>这个例子中，客户端的以RESP的Array序列化，在redis代码里叫做MultiBulk。除了这种形式，还有一种是inline形式。这种形式主要用在当你只有一个telnet工具，又想和redis服务器交互时。telnet直接发送&quot;LLEN mylist&quot;即可。</p>
+<h2 id="2-代码实现">2. 代码实现</h2>
+<h3 id="21-服务端解析接收到的resp情求">2.1 服务端解析接收到的RESP情求</h3>
+<p>当客户端的fd可读时，readQueryFromClient会从客户端中拿出数据，我们以上面这个例子客户端发送了*2\r\n$4\r\nLLEN\r\n$6\r\nmylist\r\n来实例讲解</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#75715e">/* 从fd中读数据到c-&gt;querybuf中，qblen是c-&gt;querybuf中已读的位置，readlen默认读16k
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * c-&gt;querybuf是一个sds对象，每一个client的读缓冲区
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">*/</span>
+</span></span><span style="display:flex;"><span>nread <span style="color:#f92672">=</span> <span style="color:#a6e22e">read</span>(fd, c<span style="color:#f92672">-&gt;</span>querybuf<span style="color:#f92672">+</span>qblen, readlen);
+</span></span></code></pre></div><p>读出数据后，先看看第一个字符是不是&quot;*&quot;，以此判断是multiBulk请求，还是inline请求，这是processInputBuffer来做的。此时，c-&gt;querybuf里是*2\r\n$4\r\nLLEN\r\n$6\r\nmylist\r\n，c-&gt;qb_pos是0</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">processInputBuffer</span>(client <span style="color:#f92672">*</span>c) {
+</span></span><span style="display:flex;"><span>    server.current_client <span style="color:#f92672">=</span> c;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">while</span>(c<span style="color:#f92672">-&gt;</span>qb_pos <span style="color:#f92672">&lt;</span> <span style="color:#a6e22e">sdslen</span>(c<span style="color:#f92672">-&gt;</span>querybuf)) {
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e">// ... 省去解析参数无关代码
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>      	<span style="color:#75715e">// c-&gt;reqtype表示客户端的格式是inline还是multiBulk，根据第一个字符是不是&#34;*&#34;来判断
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#66d9ef">if</span> (<span style="color:#f92672">!</span>c<span style="color:#f92672">-&gt;</span>reqtype) {
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">if</span> (c<span style="color:#f92672">-&gt;</span>querybuf[c<span style="color:#f92672">-&gt;</span>qb_pos] <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;*&#39;</span>) {
+</span></span><span style="display:flex;"><span>                c<span style="color:#f92672">-&gt;</span>reqtype <span style="color:#f92672">=</span> PROTO_REQ_MULTIBULK;
+</span></span><span style="display:flex;"><span>            } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>                c<span style="color:#f92672">-&gt;</span>reqtype <span style="color:#f92672">=</span> PROTO_REQ_INLINE;
+</span></span><span style="display:flex;"><span>            }
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> (c<span style="color:#f92672">-&gt;</span>reqtype <span style="color:#f92672">==</span> PROTO_REQ_INLINE) {
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">processInlineBuffer</span>(c) <span style="color:#f92672">!=</span> C_OK) <span style="color:#66d9ef">break</span>;
+</span></span><span style="display:flex;"><span>        } <span style="color:#66d9ef">else</span> <span style="color:#66d9ef">if</span> (c<span style="color:#f92672">-&gt;</span>reqtype <span style="color:#f92672">==</span> PROTO_REQ_MULTIBULK) {
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">processMultibulkBuffer</span>(c) <span style="color:#f92672">!=</span> C_OK) <span style="color:#66d9ef">break</span>;
+</span></span><span style="display:flex;"><span>        } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>            <span style="color:#a6e22e">serverPanic</span>(<span style="color:#e6db74">&#34;Unknown request type&#34;</span>);
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>      	<span style="color:#75715e">// ... 省略了解析完毕后执行命令的代码
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    }
+</span></span><span style="display:flex;"><span>} 
+</span></span></code></pre></div><p>如果是multiBulk形式的请求，processMultibulkBuffer来处理。当这个函数返回后，client的argc会被填充参数的个数，argv会被填充参数本身。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#75715e">// eg . c-&gt;querybuf: *2\r\n$4\r\nLLEN\r\n$6\r\nmylist\r\n
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">int</span> <span style="color:#a6e22e">processMultibulkBuffer</span>(client <span style="color:#f92672">*</span>c) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>newline <span style="color:#f92672">=</span> NULL;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int</span> ok;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">long</span> <span style="color:#66d9ef">long</span> ll;
+</span></span><span style="display:flex;"><span>		
+</span></span><span style="display:flex;"><span>  	
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (c<span style="color:#f92672">-&gt;</span>multibulklen <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>) {
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// c-&gt;multibulklen表示读缓冲区中正在解析的multibulk长度，如果是0，说明是一次新的multibulk命令，那么c-&gt;argc必须是0        
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>      	<span style="color:#a6e22e">serverAssertWithInfo</span>(c,NULL,c<span style="color:#f92672">-&gt;</span>argc <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>);
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// 先找到第一个\r，之前的数据是&#34;*&#34;和参数个数。
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        newline <span style="color:#f92672">=</span> <span style="color:#a6e22e">strchr</span>(c<span style="color:#f92672">-&gt;</span>querybuf<span style="color:#f92672">+</span>c<span style="color:#f92672">-&gt;</span>qb_pos,<span style="color:#e6db74">&#39;\r&#39;</span>);
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> (newline <span style="color:#f92672">==</span> NULL) {
+</span></span><span style="display:flex;"><span>	     <span style="color:#75715e">// 一定会有\r的，没有的话，说明客户端编码异常，打印并返回
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">sdslen</span>(c<span style="color:#f92672">-&gt;</span>querybuf)<span style="color:#f92672">-</span>c<span style="color:#f92672">-&gt;</span>qb_pos <span style="color:#f92672">&gt;</span> PROTO_INLINE_MAX_SIZE) {
+</span></span><span style="display:flex;"><span>                <span style="color:#a6e22e">addReplyError</span>(c,<span style="color:#e6db74">&#34;Protocol error: too big mbulk count string&#34;</span>);
+</span></span><span style="display:flex;"><span>                <span style="color:#a6e22e">setProtocolError</span>(<span style="color:#e6db74">&#34;too big mbulk count string&#34;</span>,c);
+</span></span><span style="display:flex;"><span>            }
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">return</span> C_ERR;
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">/* 确保newline指向的\r之后有一个\n
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">	 * newline - (c-&gt;querybuf+c-&gt;qb_pos) 是&#34;*&#34;和数字的字节长度，&#34;*2\r\n&#34;，就是2
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">	 * sdslen(c-&gt;querybuf)-c-&gt;qb_pos-2里的减2是指\r\n的2个字节长度
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">	 */</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> (newline<span style="color:#f92672">-</span>(c<span style="color:#f92672">-&gt;</span>querybuf<span style="color:#f92672">+</span>c<span style="color:#f92672">-&gt;</span>qb_pos) <span style="color:#f92672">&gt;</span> (<span style="color:#66d9ef">ssize_t</span>)(<span style="color:#a6e22e">sdslen</span>(c<span style="color:#f92672">-&gt;</span>querybuf)<span style="color:#f92672">-</span>c<span style="color:#f92672">-&gt;</span>qb_pos<span style="color:#f92672">-</span><span style="color:#ae81ff">2</span>))
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">return</span> C_ERR;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>      	<span style="color:#75715e">/* c-&gt;qb_pos的位置目前在c-&gt;querybuf的第0位 */</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">serverAssertWithInfo</span>(c,NULL,c<span style="color:#f92672">-&gt;</span>querybuf[c<span style="color:#f92672">-&gt;</span>qb_pos] <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;*&#39;</span>);
+</span></span><span style="display:flex;"><span>      	<span style="color:#75715e">/* 计算这次参数的个数
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">      	* c-&gt;querybuf+1+c-&gt;qb_pos 是越过了&#34;*&#34;，指向第一个数字，即2
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">      	* newline-(c-&gt;querybuf+1+c-&gt;qb_pos) 是数字的字节长度，即1
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">      	* 如果参数很多，例如12，则传参是指向第一个数字1，长度是2
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">      	*/</span>
+</span></span><span style="display:flex;"><span>        ok <span style="color:#f92672">=</span> <span style="color:#a6e22e">string2ll</span>(c<span style="color:#f92672">-&gt;</span>querybuf<span style="color:#f92672">+</span><span style="color:#ae81ff">1</span><span style="color:#f92672">+</span>c<span style="color:#f92672">-&gt;</span>qb_pos,newline<span style="color:#f92672">-</span>(c<span style="color:#f92672">-&gt;</span>querybuf<span style="color:#f92672">+</span><span style="color:#ae81ff">1</span><span style="color:#f92672">+</span>c<span style="color:#f92672">-&gt;</span>qb_pos),<span style="color:#f92672">&amp;</span>ll);
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> (<span style="color:#f92672">!</span>ok <span style="color:#f92672">||</span> ll <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">1024</span><span style="color:#f92672">*</span><span style="color:#ae81ff">1024</span>) {
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// 长度不能超过1MB
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#a6e22e">addReplyError</span>(c,<span style="color:#e6db74">&#34;Protocol error: invalid multibulk length&#34;</span>);
+</span></span><span style="display:flex;"><span>            <span style="color:#a6e22e">setProtocolError</span>(<span style="color:#e6db74">&#34;invalid mbulk count&#34;</span>,c);
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">return</span> C_ERR;
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// 更新读过的位置，+2是\r\n
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        c<span style="color:#f92672">-&gt;</span>qb_pos <span style="color:#f92672">=</span> (newline<span style="color:#f92672">-</span>c<span style="color:#f92672">-&gt;</span>querybuf)<span style="color:#f92672">+</span><span style="color:#ae81ff">2</span>;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> (ll <span style="color:#f92672">&lt;=</span> <span style="color:#ae81ff">0</span>) <span style="color:#66d9ef">return</span> C_OK;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        c<span style="color:#f92672">-&gt;</span>multibulklen <span style="color:#f92672">=</span> ll;
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// 分配空间，有多少个参数，argv里就有多少个object
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#66d9ef">if</span> (c<span style="color:#f92672">-&gt;</span>argv) <span style="color:#a6e22e">zfree</span>(c<span style="color:#f92672">-&gt;</span>argv);
+</span></span><span style="display:flex;"><span>        c<span style="color:#f92672">-&gt;</span>argv <span style="color:#f92672">=</span> <span style="color:#a6e22e">zmalloc</span>(<span style="color:#66d9ef">sizeof</span>(robj<span style="color:#f92672">*</span>)<span style="color:#f92672">*</span>c<span style="color:#f92672">-&gt;</span>multibulklen);
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// 参数个数要大于0
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#a6e22e">serverAssertWithInfo</span>(c,NULL,c<span style="color:#f92672">-&gt;</span>multibulklen <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">0</span>);
+</span></span><span style="display:flex;"><span>  	
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// ... 
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>}
+</span></span><span style="display:flex;"><span>   
+</span></span></code></pre></div><p>以上解析出了第一个\r\n之前的部分，得到了本次请求的参数个数2。此时，c-&gt;qb_pos是4。接着是每一个参数的解析，包含着命令本身和命令的参数。但因为不管是命令还是命令的参数，都是bulk string形式，所以解析方式也是一样的。c-&gt;bulklen表示每个参数的长度，初始值是-1，解析出参数长度后赋值，参数解析完毕后，重置为-1。如*2\r\n$4\r\nLLEN\r\n$6\r\nmylist\r\n，当解析出4时，c-&gt;bulklen=4，然后会读取bulklen个字符，读完LLEN，再重置为-1。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">int</span> <span style="color:#a6e22e">processMultibulkBuffer</span>(client <span style="color:#f92672">*</span>c) {
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// ... 上面是解析出了参数个数即c-&gt;multibulklen
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">while</span>(c<span style="color:#f92672">-&gt;</span>multibulklen) {
+</span></span><span style="display:flex;"><span>    	<span style="color:#75715e">// c-&gt;bulken还没找到下一个参数的位置。
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#66d9ef">if</span> (c<span style="color:#f92672">-&gt;</span>bulklen <span style="color:#f92672">==</span> <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>) {
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// 再找第二个\r，newline指向的内容是参数的开头
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            newline <span style="color:#f92672">=</span> <span style="color:#a6e22e">strchr</span>(c<span style="color:#f92672">-&gt;</span>querybuf<span style="color:#f92672">+</span>c<span style="color:#f92672">-&gt;</span>qb_pos,<span style="color:#e6db74">&#39;\r&#39;</span>);
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">if</span> (newline <span style="color:#f92672">==</span> NULL) {
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">sdslen</span>(c<span style="color:#f92672">-&gt;</span>querybuf)<span style="color:#f92672">-</span>c<span style="color:#f92672">-&gt;</span>qb_pos <span style="color:#f92672">&gt;</span> PROTO_INLINE_MAX_SIZE) {
+</span></span><span style="display:flex;"><span>                    <span style="color:#a6e22e">addReplyError</span>(c,
+</span></span><span style="display:flex;"><span>                        <span style="color:#e6db74">&#34;Protocol error: too big bulk count string&#34;</span>);
+</span></span><span style="display:flex;"><span>                    <span style="color:#a6e22e">setProtocolError</span>(<span style="color:#e6db74">&#34;too big bulk count string&#34;</span>,c);
+</span></span><span style="display:flex;"><span>                    <span style="color:#66d9ef">return</span> C_ERR;
+</span></span><span style="display:flex;"><span>                }
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">break</span>;
+</span></span><span style="display:flex;"><span>            }
+</span></span><span style="display:flex;"><span>	    <span style="color:#75715e">// 同样\r后面必须有\n
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#66d9ef">if</span> (newline<span style="color:#f92672">-</span>(c<span style="color:#f92672">-&gt;</span>querybuf<span style="color:#f92672">+</span>c<span style="color:#f92672">-&gt;</span>qb_pos) <span style="color:#f92672">&gt;</span> (<span style="color:#66d9ef">ssize_t</span>)(<span style="color:#a6e22e">sdslen</span>(c<span style="color:#f92672">-&gt;</span>querybuf)<span style="color:#f92672">-</span>c<span style="color:#f92672">-&gt;</span>qb_pos<span style="color:#f92672">-</span><span style="color:#ae81ff">2</span>))
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">break</span>;
+</span></span><span style="display:flex;"><span>          
+</span></span><span style="display:flex;"><span>	    <span style="color:#75715e">// 参数编码肯定是bulk string形式的，所以必须是&#34;$&#34;开头
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#66d9ef">if</span> (c<span style="color:#f92672">-&gt;</span>querybuf[c<span style="color:#f92672">-&gt;</span>qb_pos] <span style="color:#f92672">!=</span> <span style="color:#e6db74">&#39;$&#39;</span>) {
+</span></span><span style="display:flex;"><span>                <span style="color:#a6e22e">addReplyErrorFormat</span>(c,
+</span></span><span style="display:flex;"><span>                    <span style="color:#e6db74">&#34;Protocol error: expected &#39;$&#39;, got &#39;%c&#39;&#34;</span>,
+</span></span><span style="display:flex;"><span>                    c<span style="color:#f92672">-&gt;</span>querybuf[c<span style="color:#f92672">-&gt;</span>qb_pos]);
+</span></span><span style="display:flex;"><span>                <span style="color:#a6e22e">setProtocolError</span>(<span style="color:#e6db74">&#34;expected $ but got something else&#34;</span>,c);
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">return</span> C_ERR;
+</span></span><span style="display:flex;"><span>            }
+</span></span><span style="display:flex;"><span>	    <span style="color:#75715e">/* 同理取出参数长度
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">	     * c-&gt;querybuf+c-&gt;qb_pos+1 越过&#34;$&#34;，指向参数长度的第一个数字
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">	     * newline-(c-&gt;querybuf+c-&gt;qb_pos+1) 是参数长度第一个数字和\r之间的长度
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">	     */</span>
+</span></span><span style="display:flex;"><span>            ok <span style="color:#f92672">=</span> <span style="color:#a6e22e">string2ll</span>(c<span style="color:#f92672">-&gt;</span>querybuf<span style="color:#f92672">+</span>c<span style="color:#f92672">-&gt;</span>qb_pos<span style="color:#f92672">+</span><span style="color:#ae81ff">1</span>,newline<span style="color:#f92672">-</span>(c<span style="color:#f92672">-&gt;</span>querybuf<span style="color:#f92672">+</span>c<span style="color:#f92672">-&gt;</span>qb_pos<span style="color:#f92672">+</span><span style="color:#ae81ff">1</span>),<span style="color:#f92672">&amp;</span>ll);
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">if</span> (<span style="color:#f92672">!</span>ok <span style="color:#f92672">||</span> ll <span style="color:#f92672">&lt;</span> <span style="color:#ae81ff">0</span> <span style="color:#f92672">||</span> ll <span style="color:#f92672">&gt;</span> server.proto_max_bulk_len) {
+</span></span><span style="display:flex;"><span>                <span style="color:#a6e22e">addReplyError</span>(c,<span style="color:#e6db74">&#34;Protocol error: invalid bulk length&#34;</span>);
+</span></span><span style="display:flex;"><span>                <span style="color:#a6e22e">setProtocolError</span>(<span style="color:#e6db74">&#34;invalid bulk length&#34;</span>,c);
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">return</span> C_ERR;
+</span></span><span style="display:flex;"><span>            }
+</span></span><span style="display:flex;"><span>	    <span style="color:#75715e">// 再更新已读的位置，+2是越过了\r\n
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            c<span style="color:#f92672">-&gt;</span>qb_pos <span style="color:#f92672">=</span> newline<span style="color:#f92672">-</span>c<span style="color:#f92672">-&gt;</span>querybuf<span style="color:#f92672">+</span><span style="color:#ae81ff">2</span>;
+</span></span><span style="display:flex;"><span>         
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// ... 此处有个避免重复内存拷贝的优化，但和解析RESP无关，故略去
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            c<span style="color:#f92672">-&gt;</span>bulklen <span style="color:#f92672">=</span> ll;
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// 读取到了长度后，开始读参数本身
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">sdslen</span>(c<span style="color:#f92672">-&gt;</span>querybuf)<span style="color:#f92672">-</span>c<span style="color:#f92672">-&gt;</span>qb_pos <span style="color:#f92672">&lt;</span> (<span style="color:#66d9ef">size_t</span>)(c<span style="color:#f92672">-&gt;</span>bulklen<span style="color:#f92672">+</span><span style="color:#ae81ff">2</span>)) {
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* c-&gt;querybuf这个缓冲区里的数据长度已经不够刚刚读到的数字了，说明还没接收完
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">         * 那么跳出这次解析，等待下次接收更多的数据，再解析
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">         */</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">break</span>;
+</span></span><span style="display:flex;"><span>        } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>             <span style="color:#75715e">// ... 此处有个避免重复内存拷贝的优化，但和解析RESP无关，故略去
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>       
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// c-&gt;argv里每一个都是一个StringObject，创建它
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            c<span style="color:#f92672">-&gt;</span>argv[c<span style="color:#f92672">-&gt;</span>argc<span style="color:#f92672">++</span>] <span style="color:#f92672">=</span> <span style="color:#a6e22e">createStringObject</span>(c<span style="color:#f92672">-&gt;</span>querybuf<span style="color:#f92672">+</span>c<span style="color:#f92672">-&gt;</span>qb_pos,c<span style="color:#f92672">-&gt;</span>bulklen);
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// 更新已读的位置
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            c<span style="color:#f92672">-&gt;</span>qb_pos <span style="color:#f92672">+=</span> c<span style="color:#f92672">-&gt;</span>bulklen<span style="color:#f92672">+</span><span style="color:#ae81ff">2</span>;
+</span></span><span style="display:flex;"><span>            
+</span></span><span style="display:flex;"><span>           <span style="color:#75715e">// 本参数已经读取完毕，bulk string 长度归为-1，参数个数减1
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            c<span style="color:#f92672">-&gt;</span>bulklen <span style="color:#f92672">=</span> <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>            c<span style="color:#f92672">-&gt;</span>multibulklen<span style="color:#f92672">--</span>;
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    	 <span style="color:#75715e">// 开始读取下一个参数
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    }
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// 参数个数为0时，说明解析完毕
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#66d9ef">if</span> (c<span style="color:#f92672">-&gt;</span>multibulklen <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>) <span style="color:#66d9ef">return</span> C_OK;
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// 有的数据还没接收到，没能完整解析
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#66d9ef">return</span> C_ERR;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>到此时，client的argv里已经有了全部的RESP请求解析后的数据。argv里每个元素都是一个StringObject对象，该对象的ptr指向参数的值，如&quot;LLEN&quot;这个字符串。之后，就可以按照argv里的值执行命令了。</p>
+<h3 id="22-服务端返回resp回复">2.2 服务端返回RESP回复</h3>
+<p>当命令执行完毕后，服务器在返回的时候又是怎么序列化成RESP的呢？</p>
+<p>在redis启动的时候，已经预先初始化了一些对象，可以需要时直接返回，如：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>    shared.crlf <span style="color:#f92672">=</span> <span style="color:#a6e22e">createObject</span>(OBJ_STRING,<span style="color:#a6e22e">sdsnew</span>(<span style="color:#e6db74">&#34;</span><span style="color:#ae81ff">\r\n</span><span style="color:#e6db74">&#34;</span>));
+</span></span><span style="display:flex;"><span>    shared.ok <span style="color:#f92672">=</span> <span style="color:#a6e22e">createObject</span>(OBJ_STRING,<span style="color:#a6e22e">sdsnew</span>(<span style="color:#e6db74">&#34;+OK</span><span style="color:#ae81ff">\r\n</span><span style="color:#e6db74">&#34;</span>));
+</span></span><span style="display:flex;"><span>    shared.err <span style="color:#f92672">=</span> <span style="color:#a6e22e">createObject</span>(OBJ_STRING,<span style="color:#a6e22e">sdsnew</span>(<span style="color:#e6db74">&#34;-ERR</span><span style="color:#ae81ff">\r\n</span><span style="color:#e6db74">&#34;</span>));
+</span></span><span style="display:flex;"><span>    shared.emptybulk <span style="color:#f92672">=</span> <span style="color:#a6e22e">createObject</span>(OBJ_STRING,<span style="color:#a6e22e">sdsnew</span>(<span style="color:#e6db74">&#34;$0</span><span style="color:#ae81ff">\r\n\r\n</span><span style="color:#e6db74">&#34;</span>));
+</span></span><span style="display:flex;"><span>    shared.czero <span style="color:#f92672">=</span> <span style="color:#a6e22e">createObject</span>(OBJ_STRING,<span style="color:#a6e22e">sdsnew</span>(<span style="color:#e6db74">&#34;:0</span><span style="color:#ae81ff">\r\n</span><span style="color:#e6db74">&#34;</span>));
+</span></span><span style="display:flex;"><span>    shared.cone <span style="color:#f92672">=</span> <span style="color:#a6e22e">createObject</span>(OBJ_STRING,<span style="color:#a6e22e">sdsnew</span>(<span style="color:#e6db74">&#34;:1</span><span style="color:#ae81ff">\r\n</span><span style="color:#e6db74">&#34;</span>));
+</span></span><span style="display:flex;"><span>    shared.cnegone <span style="color:#f92672">=</span> <span style="color:#a6e22e">createObject</span>(OBJ_STRING,<span style="color:#a6e22e">sdsnew</span>(<span style="color:#e6db74">&#34;:-1</span><span style="color:#ae81ff">\r\n</span><span style="color:#e6db74">&#34;</span>));
+</span></span><span style="display:flex;"><span>    shared.nullbulk <span style="color:#f92672">=</span> <span style="color:#a6e22e">createObject</span>(OBJ_STRING,<span style="color:#a6e22e">sdsnew</span>(<span style="color:#e6db74">&#34;$-1</span><span style="color:#ae81ff">\r\n</span><span style="color:#e6db74">&#34;</span>));
+</span></span><span style="display:flex;"><span>    shared.nullmultibulk <span style="color:#f92672">=</span> <span style="color:#a6e22e">createObject</span>(OBJ_STRING,<span style="color:#a6e22e">sdsnew</span>(<span style="color:#e6db74">&#34;*-1</span><span style="color:#ae81ff">\r\n</span><span style="color:#e6db74">&#34;</span>));
+</span></span><span style="display:flex;"><span>    shared.emptymultibulk <span style="color:#f92672">=</span> <span style="color:#a6e22e">createObject</span>(OBJ_STRING,<span style="color:#a6e22e">sdsnew</span>(<span style="color:#e6db74">&#34;*0</span><span style="color:#ae81ff">\r\n</span><span style="color:#e6db74">&#34;</span>));
+</span></span><span style="display:flex;"><span>    shared.pong <span style="color:#f92672">=</span> <span style="color:#a6e22e">createObject</span>(OBJ_STRING,<span style="color:#a6e22e">sdsnew</span>(<span style="color:#e6db74">&#34;+PONG</span><span style="color:#ae81ff">\r\n</span><span style="color:#e6db74">&#34;</span>));
+</span></span><span style="display:flex;"><span>    shared.queued <span style="color:#f92672">=</span> <span style="color:#a6e22e">createObject</span>(OBJ_STRING,<span style="color:#a6e22e">sdsnew</span>(<span style="color:#e6db74">&#34;+QUEUED</span><span style="color:#ae81ff">\r\n</span><span style="color:#e6db74">&#34;</span>));
+</span></span><span style="display:flex;"><span>    shared.emptyscan <span style="color:#f92672">=</span> <span style="color:#a6e22e">createObject</span>(OBJ_STRING,<span style="color:#a6e22e">sdsnew</span>(<span style="color:#e6db74">&#34;*2</span><span style="color:#ae81ff">\r\n</span><span style="color:#e6db74">$1</span><span style="color:#ae81ff">\r\n</span><span style="color:#e6db74">0</span><span style="color:#ae81ff">\r\n</span><span style="color:#e6db74">*0</span><span style="color:#ae81ff">\r\n</span><span style="color:#e6db74">&#34;</span>));
+</span></span></code></pre></div><p>这些已经按照RESP来构造好了字符串。</p>
+<p>addReply*系列会调用_addReplyToBuffer把要发送的数据放在客户端的缓冲区里：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">addReply</span>(client <span style="color:#f92672">*</span>c, robj <span style="color:#f92672">*</span>obj) {
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e">// ... 
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">sdsEncodedObject</span>(obj)) {
+</span></span><span style="display:flex;"><span>      	<span style="color:#75715e">// obj-&gt;ptr是要发送的数据如 &#34;+OK\r\n&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">_addReplyToBuffer</span>(c,obj<span style="color:#f92672">-&gt;</span>ptr,<span style="color:#a6e22e">sdslen</span>(obj<span style="color:#f92672">-&gt;</span>ptr)) <span style="color:#f92672">!=</span> C_OK)
+</span></span><span style="display:flex;"><span>          <span style="color:#75715e">// 
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    } 
+</span></span><span style="display:flex;"><span>  	<span style="color:#75715e">// ... 其他
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">int</span> <span style="color:#a6e22e">_addReplyToBuffer</span>(client <span style="color:#f92672">*</span>c, <span style="color:#66d9ef">const</span> <span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>s, <span style="color:#66d9ef">size_t</span> len) {
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// ... 
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#a6e22e">memcpy</span>(c<span style="color:#f92672">-&gt;</span>buf<span style="color:#f92672">+</span>c<span style="color:#f92672">-&gt;</span>bufpos,s,len);
+</span></span><span style="display:flex;"><span>    c<span style="color:#f92672">-&gt;</span>bufpos<span style="color:#f92672">+=</span>len;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> C_OK;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>所以如果是返回简单字符串，只需要调用：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-C" data-lang="C"><span style="display:flex;"><span><span style="color:#a6e22e">addReply</span>(c,shared.pong);
+</span></span></code></pre></div><p>如果是返回整数，调用</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#a6e22e">addReply</span>(c,shared.colon);
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">addReply</span>(c,new);
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">addReply</span>(c,shared.crlf);
+</span></span></code></pre></div><p>返回bulk string时，addReplyBulkLen支持&quot;$&ldquo;前缀</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">addReplyBulkLen</span>(client <span style="color:#f92672">*</span>c, robj <span style="color:#f92672">*</span>obj) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">size_t</span> len;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">sdsEncodedObject</span>(obj)) {
+</span></span><span style="display:flex;"><span>     	<span style="color:#75715e">// 是字符串的，从ptr中拿sds对象长度
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        len <span style="color:#f92672">=</span> <span style="color:#a6e22e">sdslen</span>(obj<span style="color:#f92672">-&gt;</span>ptr);
+</span></span><span style="display:flex;"><span>    } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>      	<span style="color:#75715e">// 不是字符串的，计算数字的十进制位数。每次除10，就可以去掉1位，计数加1。除到0为止。
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#66d9ef">long</span> n <span style="color:#f92672">=</span> (<span style="color:#66d9ef">long</span>)obj<span style="color:#f92672">-&gt;</span>ptr;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        len <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> (n <span style="color:#f92672">&lt;</span> <span style="color:#ae81ff">0</span>) {
+</span></span><span style="display:flex;"><span>            len<span style="color:#f92672">++</span>;
+</span></span><span style="display:flex;"><span>            n <span style="color:#f92672">=</span> <span style="color:#f92672">-</span>n;
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">while</span>((n <span style="color:#f92672">=</span> n<span style="color:#f92672">/</span><span style="color:#ae81ff">10</span>) <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span>) {
+</span></span><span style="display:flex;"><span>            len<span style="color:#f92672">++</span>;
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>		
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (len <span style="color:#f92672">&lt;</span> OBJ_SHARED_BULKHDR_LEN)
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">addReply</span>(c,shared.bulkhdr[len]);
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">else</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">addReplyLongLongWithPrefix</span>(c,len,<span style="color:#e6db74">&#39;$&#39;</span>);
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>当长度小于32时，shared.bulkhdr是redis启动时预先分配好的前缀字符串</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>shared.bulkhdr[j] <span style="color:#f92672">=</span> <span style="color:#a6e22e">createObject</span>(OBJ_STRING, <span style="color:#a6e22e">sdscatprintf</span>(<span style="color:#a6e22e">sdsempty</span>(),<span style="color:#e6db74">&#34;$%d</span><span style="color:#ae81ff">\r\n</span><span style="color:#e6db74">&#34;</span>,j))
+</span></span></code></pre></div><p>当长度过大时，addReplyLongLongWithPrefix把前缀补充完整</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">addReplyLongLongWithPrefix</span>(client <span style="color:#f92672">*</span>c, <span style="color:#66d9ef">long</span> <span style="color:#66d9ef">long</span> ll, <span style="color:#66d9ef">char</span> prefix) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">char</span> buf[<span style="color:#ae81ff">128</span>];
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int</span> len;
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// 同样，如果能用预分配的就用预分配的
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#66d9ef">if</span> (prefix <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;*&#39;</span> <span style="color:#f92672">&amp;&amp;</span> ll <span style="color:#f92672">&lt;</span> OBJ_SHARED_BULKHDR_LEN <span style="color:#f92672">&amp;&amp;</span> ll <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0</span>) {
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">addReply</span>(c,shared.mbulkhdr[ll]);
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span>;
+</span></span><span style="display:flex;"><span>    } <span style="color:#66d9ef">else</span> <span style="color:#66d9ef">if</span> (prefix <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;$&#39;</span> <span style="color:#f92672">&amp;&amp;</span> ll <span style="color:#f92672">&lt;</span> OBJ_SHARED_BULKHDR_LEN <span style="color:#f92672">&amp;&amp;</span> ll <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0</span>) {
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">addReply</span>(c,shared.bulkhdr[ll]);
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span>;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// 否则补上*\r\n前缀或$\r\n前缀
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    buf[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">=</span> prefix;
+</span></span><span style="display:flex;"><span>    len <span style="color:#f92672">=</span> <span style="color:#a6e22e">ll2string</span>(buf<span style="color:#f92672">+</span><span style="color:#ae81ff">1</span>,<span style="color:#66d9ef">sizeof</span>(buf)<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>,ll);
+</span></span><span style="display:flex;"><span>    buf[len<span style="color:#f92672">+</span><span style="color:#ae81ff">1</span>] <span style="color:#f92672">=</span> <span style="color:#e6db74">&#39;\r&#39;</span>;
+</span></span><span style="display:flex;"><span>    buf[len<span style="color:#f92672">+</span><span style="color:#ae81ff">2</span>] <span style="color:#f92672">=</span> <span style="color:#e6db74">&#39;\n&#39;</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">addReplyString</span>(c,buf,len<span style="color:#f92672">+</span><span style="color:#ae81ff">3</span>);
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>所以，返回批量字符串bulk string时，只需要调用</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">addReplyBulk</span>(client <span style="color:#f92672">*</span>c, robj <span style="color:#f92672">*</span>obj) {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">addReplyBulkLen</span>(c,obj);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">addReply</span>(c,obj);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">addReply</span>(c,shared.crlf);
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>返回数组multi bulk时，也有如下函数支持</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">addReplyMultiBulkLen</span>(client <span style="color:#f92672">*</span>c, <span style="color:#66d9ef">long</span> length) 
+</span></span></code></pre></div><p>逻辑相似，此处就不再赘述了。</p></div>
+    <div class="post__footer">
+      
+
+      
+    </div>
+
+    
+  </div>
+
+      </main>
+    </div><footer class="footer footer__base">
+  <ul class="footer__list">
+    <li class="footer__item">
+      &copy;
+      
+        saberrao
+        2024
+      
+    </li>
+    
+  </ul>
+</footer>
+  
+  <script
+    type="text/javascript"
+    src="/articles/js/medium-zoom.min.1248fa75275e5ef0cbef27e8c1e27dc507c445ae3a2c7d2ed0be0809555dac64.js"
+    integrity="sha256-Ekj6dSdeXvDL7yfoweJ9xQfERa46LH0u0L4ICVVdrGQ="
+    crossorigin="anonymous"
+  ></script></body>
+</html>
