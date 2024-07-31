@@ -7,5 +7,43 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <lastBuildDate>Wed, 31 Jul 2024 20:16:56 +0800</lastBuildDate><atom:link href="https://raoxuanxuan.github.io/articles/redis/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>RESP</title>
+      <link>https://raoxuanxuan.github.io/articles/redis/resp/</link>
+      <pubDate>Wed, 31 Jul 2024 20:16:56 +0800</pubDate>
+      
+      <guid>https://raoxuanxuan.github.io/articles/redis/resp/</guid>
+      
+        <description>&lt;p&gt;redis客户端和服务器之间使用之定义的序列化协议来交互的，称为RESP(Redis Serialization Protocol)。这个协议实现简单，人类可读，且能够被快速解析。理解它的方式，对了解redis大有帮助。&lt;/p&gt;</description>
+      
+    </item>
+    
+    <item>
+      <title>Redis事件驱动</title>
+      <link>https://raoxuanxuan.github.io/articles/redis/redis%E4%BA%8B%E4%BB%B6%E9%A9%B1%E5%8A%A8/</link>
+      <pubDate>Wed, 31 Jul 2024 20:11:38 +0800</pubDate>
+      
+      <guid>https://raoxuanxuan.github.io/articles/redis/redis%E4%BA%8B%E4%BB%B6%E9%A9%B1%E5%8A%A8/</guid>
+      
+        <description>提到redis为什么很快，主要有下面三个方面：
+单线程，避免调度和锁开销 非阻塞的IO复用模型 纯内存操作 这篇文章就主要探讨一下redis的事件循环模型。
+6.0版本之前的redis，主流程都是单线程的（有一些辅助的后台线程，如删除过期键，持久化等，但整个在线服务的流程都是单线程的）。既然是单线程，就必须配合使用非阻塞IO和IO复用。IO复用可以同时监听多个文件描述符上的读写事件。有文件描述符可读可写了，就返回到业务代码中，由业务代码来处理。
+基于这个逻辑，redis定义了文件事件。文件事件、时间事件、IO复用构成了redis整个事件循环。
+1. reactor模式 redis事件处理是reactor模式。什么是reactor模式呢？总体来说，是这样的：主线程只负责监听文件描述符上是否有事件发生。有事件发生时，即某操作就绪了，通知工作线程来处理，工作线程完成accept, read，write操作。如果使用同步的IO模型（非阻塞IO+IO复用epoll）来实现reactor模式，流程如下：
+主线程往epoll内核事件表中注册socket上的读就绪事件EPOLLIN。表示这个socket有数据的话， 就可以通知了。 主线程调用epoll_wait等待该socket可读。 当socket上有数据可读时，epoll_wait返回。此时主线程用一个可读消息通知某工作线程，工作线程从socket中读数据，处理请求，再给epoll的内核事件表中注册该socket的写就绪时间EPOLLOUT。表示如果这个socket可以发数据的话，就可以通知了。 主线程调用epoll_wait等待该socket可写。 当socket可以发数据了时，epoll_wait返回。此时主线程用一个可写消息通知工作线程，工作线程把请求处理完后的响应写到socket里。 redis也是实现了reactor模式，不过它只有一个线程，所以主线程和工作线程都是同一个。
+reactor模式的UML图示如下：
+Initiation Dispatcher是整体框架，是一个事件循环器。它负责得到事件，绑定事件和处理函数，驱动事件处理不断发生。它提供三个方法，handle_events等待事件发生，register_handler把事件和处理函数绑定，remove_handler把事件和处理函数解绑。一般在while循环中，不断调用handle_events来拿到发生的事件并处理。
+Synchronous Event Demultiplexer是真正做IO复用的地方，比如select，epoll机制等，Initiation Dispatcher也是用它来做事件获取。
+Handle代表文件描述符，是事件发生的对象。
+Event Handler是事件处理接口，Concrete Event Handler实现了它。
+2. 事件类型 redis中一共有两种事件，文件事件和时间事件。这两种事件一直不断的发生，驱动着流程向前。
+2.1 文件事件 当一个文件描述符产生了可读可写事件时，redis就生成一个文件事件。连接发起、接收数据、发送数据、连接断开等都会在fd上产生一个网络事件，redis把这些网络事件封装成文件事件。每个文件事件记录了三个主要信息：哪个文件描述符、是可读还是可写、用什么函数处理。先看看文件事件的定义：
+typedef struct aeFileEvent { int mask; /* one of AE_(READABLE|WRITABLE|BARRIER) */ aeFileProc *rfileProc; aeFileProc *wfileProc; void *clientData; } aeFileEvent; 字段说明：
+mask用来表示这是个读还是写事件 clientData含有fd等这些数据 rFileProc和wfileProc则是分别对于读写时间的处理函数，相当于reactor中的EventHandler。 从上面三个结构体可以看出，当一个fd上有了可读可写事件后，会有一个aeFileEvent对象生成，关联了fd（clientData）和handler(rfileProc/wfileProc)。这个对象完成了reactor中registe_handler过程。
+2.2 时间事件 由于IO复用本身是同步阻塞的，所以IO复用的调用中，都需要指定一个超时时间。这个超时时间从哪里来？redis定义了时间事件。先看看时间事件的定义：
+typedef struct aeTimeEvent { long long id; /* time event identifier.</description>
+      
+    </item>
+    
   </channel>
 </rss>
